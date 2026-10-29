@@ -61,19 +61,19 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: 'Catalog',
     entries: [
-      { to: '/items', label: 'Products', icon: <InboxIcon size={18} />, permissions: [CATALOG_PERMISSIONS.ITEM_VIEW] },
-      {
-        to: '/services',
-        label: 'Services',
-        icon: <AccountIcon />,
-        permissions: [CATALOG_PERMISSIONS.SERVICE_VIEW],
-      },
-      {
-        to: '/materials',
-        label: 'Raw materials',
-        icon: <InboxIcon size={18} />,
-        permissions: [CATALOG_PERMISSIONS.MATERIAL_VIEW],
-      },
+      // { to: '/items', label: 'Products', icon: <InboxIcon size={18} />, permissions: [CATALOG_PERMISSIONS.ITEM_VIEW] },
+      // {
+      //   to: '/services',
+      //   label: 'Services',
+      //   icon: <AccountIcon />,
+      //   permissions: [CATALOG_PERMISSIONS.SERVICE_VIEW],
+      // },
+      // {
+      //   to: '/materials',
+      //   label: 'Raw materials',
+      //   icon: <InboxIcon size={18} />,
+      //   permissions: [CATALOG_PERMISSIONS.MATERIAL_VIEW],
+      // },
       {
         to: '/units',
         label: 'Units',
