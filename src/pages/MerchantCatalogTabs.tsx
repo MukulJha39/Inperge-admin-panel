@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { ApiError } from '../api/client';
 import {
-  fetchAdminItems,
-  fetchAdminMaterials,
-  fetchAdminServices,
   fetchAdminStockMovements,
   fetchMerchantBusiness,
   fetchMerchantCatalogSummary,
@@ -12,9 +9,6 @@ import {
 } from '../api/endpoints';
 import type {
   Business,
-  CatalogItem,
-  CatalogMaterial,
-  CatalogService,
   CatalogSummary,
   Category,
   Paginated,
@@ -23,7 +17,6 @@ import type {
 import { useAuth } from '../auth/AuthContext';
 import { CATALOG_PERMISSIONS } from '../auth/permissions';
 import { Button } from '../components/Button';
-import { StockCell, StockStatusCell } from '../components/CatalogToolbar';
 import { Chip } from '../components/Chip';
 import { DataTable, type Column } from '../components/DataTable';
 import { Drawer } from '../components/Drawer';
@@ -33,20 +26,16 @@ import { Pagination } from '../components/Pagination';
 import { ErrorState, InlineAlert, Skeleton } from '../components/States';
 import { useToast } from '../components/Toast';
 import {
-  billingUnitLabel,
   businessCategoryLabel,
-  formatDate,
   formatDateTime,
   formatDelta,
-  formatMoneyMinor,
   formatQuantity,
   movementTypeLabel,
   stockReasonLabel,
-  unitLabel,
 } from '../utils/format';
 import { useCatalogList } from '../utils/useCatalogList';
 import { useCatalogMeta } from '../utils/useCatalogMeta';
-import { NameWithThumb } from '../components/CatalogImages';
+import { CategoryManagerDrawer } from './CatalogForms';
 
 function SummaryItem({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -274,6 +263,11 @@ export function MerchantBusinessPanel({ merchantId }: { merchantId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const [editing, setEditing] = useState(false);
+  const [managingCategories, setManagingCategories] = useState(false);
+  const canManageCategories =
+    can(CATALOG_PERMISSIONS.ITEM_MANAGE) ||
+    can(CATALOG_PERMISSIONS.SERVICE_MANAGE) ||
+    can(CATALOG_PERMISSIONS.MATERIAL_MANAGE);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -430,7 +424,14 @@ export function MerchantBusinessPanel({ merchantId }: { merchantId: string }) {
       <section className="card">
         <div className="card__header">
           <h3 className="card__title">Categories</h3>
-          <span className="text-sm text-muted">{categories.length} defined</span>
+          <span className="row gap-3">
+            <span className="text-sm text-muted">{categories.length} defined</span>
+            {canManageCategories ? (
+              <Button size="sm" variant="secondary" onClick={() => setManagingCategories(true)}>
+                Manage categories
+              </Button>
+            ) : null}
+          </span>
         </div>
         <div className="card__body">
           {categories.length === 0 ? (
@@ -453,6 +454,14 @@ export function MerchantBusinessPanel({ merchantId }: { merchantId: string }) {
           )}
         </div>
       </section>
+
+      <CategoryManagerDrawer
+        merchantId={merchantId}
+        merchantName={business?.name ?? null}
+        open={managingCategories}
+        onClose={() => setManagingCategories(false)}
+        onChanged={() => setReloadToken((token) => token + 1)}
+      />
 
       <BusinessEditDrawer
         merchantId={merchantId}
@@ -501,159 +510,6 @@ function MerchantPanel<T extends { id: string }>({
         <Pagination meta={list.meta} noun={noun} onPageChange={list.setPage} onLimitChange={list.setLimit} />
       ) : null}
     </section>
-  );
-}
-
-export function MerchantItemsPanel({ merchantId }: { merchantId: string }) {
-  const list = useCatalogList<CatalogItem>(
-    useCallback((query, signal) => fetchAdminItems(query, signal) as Promise<Paginated<CatalogItem>>, []),
-    { merchantId, sort: 'name' },
-  );
-
-  const columns: Column<CatalogItem>[] = [
-    {
-      key: 'name',
-      header: 'Product',
-      grow: true,
-      sortable: true,
-      render: (item) => <NameWithThumb record={item} name={item.name} />,
-    },
-    { key: 'sku', header: 'SKU', render: (item) => item.sku ?? '—' },
-    {
-      key: 'quantityThousandths',
-      header: 'Available',
-      sortable: true,
-      render: (item) => (
-        <StockCell
-          quantity={item.quantity}
-          unit={item.unit}
-          trackStock={item.trackStock}
-          unitLabel={unitLabel}
-        />
-      ),
-    },
-    {
-      key: 'stockStatus',
-      header: 'Stock status',
-      render: (item) => <StockStatusCell isLowStock={item.isLowStock} isOutOfStock={item.isOutOfStock} trackStock={item.trackStock} />,
-    },
-    {
-      key: 'price',
-      header: 'Price',
-      numeric: true,
-      render: (item) => <span className="text-numeric">{formatMoneyMinor(item.sellingPriceMinor)}</span>,
-    },
-  ];
-
-  return (
-    <MerchantPanel
-      columns={columns}
-      list={list}
-      noun="products"
-      emptyTitle="No products yet"
-      emptyMessage="This merchant has not added anything to sell."
-    />
-  );
-}
-
-export function MerchantServicesPanel({ merchantId }: { merchantId: string }) {
-  const list = useCatalogList<CatalogService>(
-    useCallback(
-      (query, signal) => fetchAdminServices(query, signal) as Promise<Paginated<CatalogService>>,
-      [],
-    ),
-    { merchantId, sort: 'name' },
-  );
-
-  const columns: Column<CatalogService>[] = [
-    { key: 'name', header: 'Service',
-      grow: true, sortable: true, render: (service) => <NameWithThumb record={service} name={service.name} /> },
-    {
-      key: 'billing',
-      header: 'Billing',
-      render: (service) => billingUnitLabel(service.billingUnit),
-    },
-    {
-      key: 'rateMinor',
-      header: 'Rate',
-      sortable: true,
-      numeric: true,
-      render: (service) => <span className="text-numeric">{formatMoneyMinor(service.rateMinor)}</span>,
-    },
-    {
-      key: 'status',
-      header: 'Availability',
-      render: (service) => (
-        <Chip tone={service.isActive ? 'success' : 'neutral'} dot>
-          {service.isActive ? 'Offered' : 'Off the menu'}
-        </Chip>
-      ),
-    },
-  ];
-
-  return (
-    <MerchantPanel
-      columns={columns}
-      list={list}
-      noun="services"
-      emptyTitle="No services yet"
-      emptyMessage="This merchant has not added any work they sell."
-    />
-  );
-}
-
-export function MerchantMaterialsPanel({ merchantId }: { merchantId: string }) {
-  const list = useCatalogList<CatalogMaterial>(
-    useCallback(
-      (query, signal) => fetchAdminMaterials(query, signal) as Promise<Paginated<CatalogMaterial>>,
-      [],
-    ),
-    { merchantId, sort: 'name' },
-  );
-
-  const columns: Column<CatalogMaterial>[] = [
-    {
-      key: 'name',
-      header: 'Raw material',
-      grow: true,
-      sortable: true,
-      render: (material) => <NameWithThumb record={material} name={material.name} />,
-    },
-    { key: 'batchReference', header: 'Batch reference', render: (material) => material.batchReference ?? '—' },
-    {
-      key: 'quantityThousandths',
-      header: 'Available',
-      sortable: true,
-      render: (material) => (
-        <StockCell
-          quantity={material.quantity}
-          unit={material.unit}
-          trackStock={material.trackStock}
-          unitLabel={unitLabel}
-        />
-      ),
-    },
-    {
-      key: 'stockStatus',
-      header: 'Stock status',
-      render: (material) => <StockStatusCell isLowStock={material.isLowStock} isOutOfStock={material.isOutOfStock} trackStock={material.trackStock} />,
-    },
-    {
-      key: 'expiryDate',
-      header: 'Expires',
-      sortable: true,
-      render: (material) => (material.expiryDate ? formatDate(material.expiryDate) : '—'),
-    },
-  ];
-
-  return (
-    <MerchantPanel
-      columns={columns}
-      list={list}
-      noun="raw materials"
-      emptyTitle="No raw materials yet"
-      emptyMessage="This merchant has not recorded what they buy."
-    />
   );
 }
 

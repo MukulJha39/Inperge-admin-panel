@@ -2992,3 +2992,112 @@ button.thumb:focus-visible {
     transform: none;
   }
 }
+
+/* Payment rows: correction buttons stay quiet until the row is pointed at or focused. */
+.payment-row__actions {
+  opacity: 0.55;
+  transition: opacity var(--transition-fast);
+}
+
+.payment-row:hover .payment-row__actions,
+.payment-row:focus-within .payment-row__actions {
+  opacity: 1;
+}
+
+/* A detail-grid cell that spans the full width, for long values such as an address. */
+.detail-grid__wide {
+  grid-column: 1 / -1;
+}
+
+/* Keeps the line breaks someone typed, as in a multi-line address. */
+.text-pre-line {
+  white-space: pre-line;
+}
+
+/* Editable gallery: an "add" tile and small tools under each photo. */
+.gallery__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gallery__tile--add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-style: dashed;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.gallery__tile--add:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.gallery__tools {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  min-height: 22px;
+}
+
+.gallery__tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.gallery__tool:hover:not(:disabled) {
+  border-color: var(--color-primary-border);
+  color: var(--color-primary);
+}
+
+.gallery__tool--danger {
+  margin-left: auto;
+}
+
+.gallery__tool--danger:hover:not(:disabled) {
+  border-color: var(--color-danger-border);
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+
+.gallery__tool:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* A catalog list shown inside a merchant page: a compact heading with its Add action. */
+.scoped-heading {
+  margin-bottom: var(--space-4);
+}
+
+.category-add {
+  align-items: flex-end;
+}
+
+.category-add .field {
+  flex: 1;
+}
+
+.category-row {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  list-style: none;
+}

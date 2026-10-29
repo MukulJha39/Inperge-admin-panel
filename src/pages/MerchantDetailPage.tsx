@@ -26,9 +26,6 @@ import {
 } from '../utils/format';
 import {
   MerchantBusinessPanel,
-  MerchantItemsPanel,
-  MerchantMaterialsPanel,
-  MerchantServicesPanel,
   MerchantStockPanel,
 } from './MerchantCatalogTabs';
 import {
@@ -46,6 +43,7 @@ import {
 } from './MerchantOrderTabs';
 import { MerchantFormDrawer } from './MerchantFormDrawer';
 import { MerchantStatusDialog } from './MerchantStatusDialog';
+import { ItemsPage, MaterialsPage, ServicesPage } from './CatalogPages';
 
 function SummaryItem({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -336,15 +334,15 @@ export function MerchantDetailPage() {
       </TabPanel>
 
       <TabPanel id="items" activeId={activeTab}>
-        <MerchantItemsPanel merchantId={id} />
+        <ItemsPage scope={{ merchantId: id, merchantName: merchant.fullName }} />
       </TabPanel>
 
       <TabPanel id="services" activeId={activeTab}>
-        <MerchantServicesPanel merchantId={id} />
+        <ServicesPage scope={{ merchantId: id, merchantName: merchant.fullName }} />
       </TabPanel>
 
       <TabPanel id="materials" activeId={activeTab}>
-        <MerchantMaterialsPanel merchantId={id} />
+        <MaterialsPage scope={{ merchantId: id, merchantName: merchant.fullName }} />
       </TabPanel>
 
       <TabPanel id="stock" activeId={activeTab}>

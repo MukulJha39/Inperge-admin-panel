@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../auth/AuthContext';
+import { ORDER_PERMISSIONS } from '../auth/permissions';
 import {
   fetchAdminInstallments,
   fetchAdminOrders,
@@ -29,6 +31,8 @@ import {
   ORDER_STATUS_FILTER_OPTIONS,
   orderStatusLabel,
   orderStatusTone,
+  formatDeliveryTime,
+  hasDelivery,
 } from '../utils/orderFormat';
 import {
   PAYMENT_METHOD_OPTIONS,
@@ -39,6 +43,7 @@ import {
 } from '../utils/paymentFormat';
 import { useCatalogList } from '../utils/useCatalogList';
 import { OrderDetailPanel } from './OrderDetail';
+import { PaymentActions, PaymentDeleteDialog, PaymentEditDrawer } from './PaymentCorrection';
 
 /** Links a row back to the merchant who owns it. */
 function MerchantLink({
@@ -296,6 +301,25 @@ export function OrdersPage() {
       header: 'Total instalments',
       numeric: true,
       render: (order) => order.installments.length || '—',
+    },
+    {
+      key: 'deliveryDate',
+      header: 'Delivery',
+      sortable: true,
+      render: (order) =>
+        hasDelivery(order) ? (
+          <span className="stack" title={order.deliveryLocation ?? undefined}>
+            <span className="text-sm">
+              {formatDate(order.deliveryDate)}
+              {order.deliveryTime ? ` · ${formatDeliveryTime(order.deliveryTime)}` : ''}
+            </span>
+            {order.deliveryLocation ? (
+              <span className="text-xs text-secondary truncate">{order.deliveryLocation}</span>
+            ) : null}
+          </span>
+        ) : (
+          <span className="text-sm text-secondary">—</span>
+        ),
     },
     {
       key: 'dueDate',
@@ -709,6 +733,10 @@ export function PaymentsPage() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [merchantId, setMerchantId] = useState('');
+  const [editing, setEditing] = useState<PaymentEntry | null>(null);
+  const [deleting, setDeleting] = useState<PaymentEntry | null>(null);
+  const { can } = useAuth();
+  const canCorrect = can(ORDER_PERMISSIONS.PAYMENT_MANAGE);
 
   const fetcher = useCallback(
     (query: Parameters<typeof fetchAdminPayments>[0], signal: AbortSignal) =>
@@ -808,6 +836,17 @@ export function PaymentsPage() {
       render: (entry) =>
         entry.actorType === 'admin' ? <Chip tone="info">{entry.actorLabel}</Chip> : '—',
     },
+    ...(canCorrect
+      ? [
+          {
+            key: 'actions',
+            header: '',
+            render: (entry: PaymentEntry) => (
+              <PaymentActions payment={entry} onEdit={setEditing} onDelete={setDeleting} />
+            ),
+          },
+        ]
+      : []),
   ];
 
   const activeFilters = [
@@ -829,7 +868,7 @@ export function PaymentsPage() {
     <>
       <PageHeader
         title="Payments"
-        description="Every payment entry across every merchant. The history is append-only — a mistake is corrected by a further entry."
+        description="Every payment entry across every merchant. A payment entered wrong can be corrected or deleted; the order or purchase is recalculated and the change kept in the audit history."
         badge={payments.loading ? null : <Chip tone="brand">{payments.meta.total} entries</Chip>}
       />
 
@@ -886,6 +925,9 @@ export function PaymentsPage() {
 
         <Pagination meta={payments.meta} onPageChange={payments.setPage} />
       </section>
+
+      <PaymentEditDrawer payment={editing} onClose={() => setEditing(null)} onSaved={payments.reload} />
+      <PaymentDeleteDialog payment={deleting} onClose={() => setDeleting(null)} onDeleted={payments.reload} />
     </>
   );
 }

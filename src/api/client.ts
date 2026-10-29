@@ -160,7 +160,9 @@ async function refreshSession(): Promise<boolean> {
 
 async function send<T>(path: string, options: RequestOptions, isRetry = false): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/json' };
-  if (options.body !== undefined) headers['Content-Type'] = 'application/json';
+  // A file upload goes as multipart; the browser sets that content type with its boundary.
+  const isForm = typeof FormData !== 'undefined' && options.body instanceof FormData;
+  if (options.body !== undefined && !isForm) headers['Content-Type'] = 'application/json';
 
   if (!options.anonymous) {
     const stored = tokenStore.read();
@@ -172,7 +174,9 @@ async function send<T>(path: string, options: RequestOptions, isRetry = false): 
     response = await fetch(buildUrl(path, options.query), {
       method: options.method ?? 'GET',
       headers,
-      ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
+      ...(options.body !== undefined
+        ? { body: isForm ? (options.body as FormData) : JSON.stringify(options.body) }
+        : {}),
       ...(options.signal ? { signal: options.signal } : {}),
     });
   } catch (error) {

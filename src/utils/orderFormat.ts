@@ -106,3 +106,21 @@ export const WALK_IN_LABEL = 'Walk-in sale';
 export function customerLabel(customerName: string | null): string {
   return customerName ?? WALK_IN_LABEL;
 }
+
+/** A 24-hour `HH:mm` delivery time as it reads in the panel, for example "6:30 PM". */
+export function formatDeliveryTime(time: string | null | undefined): string {
+  const match = time ? /^(\d{2}):(\d{2})$/.exec(time) : null;
+  if (!match) return '—';
+  const hours = Number(match[1]);
+  const suffix = hours < 12 ? 'AM' : 'PM';
+  return `${hours % 12 || 12}:${match[2]} ${suffix}`;
+}
+
+/** Whether any of an order's delivery details are set. */
+export function hasDelivery(order: {
+  deliveryDate?: string | null;
+  deliveryTime?: string | null;
+  deliveryLocation?: string | null;
+}): boolean {
+  return Boolean(order.deliveryDate || order.deliveryTime || order.deliveryLocation);
+}

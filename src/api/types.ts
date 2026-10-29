@@ -302,6 +302,52 @@ export interface CatalogMaterial extends StockFields {
   updatedAt: string;
 }
 
+/** What a product create or edit may send, exactly as the merchant app does. */
+export interface CatalogItemInput {
+  name?: string;
+  categoryId?: string | null;
+  description?: string | null;
+  sku?: string | null;
+  barcode?: string | null;
+  unit?: string;
+  trackStock?: boolean;
+  sellingPriceMinor?: number;
+  costPriceMinor?: number | null;
+  taxRatePercent?: number | null;
+  lowStockThreshold?: number;
+  /** Create only: the stock the product starts with, recorded as an opening entry. */
+  openingQuantity?: number;
+}
+
+export interface CatalogServiceInput {
+  name?: string;
+  categoryId?: string | null;
+  description?: string | null;
+  billingUnit?: BillingUnit;
+  rateMinor?: number;
+  durationMinutes?: number | null;
+  taxRatePercent?: number | null;
+  isActive?: boolean;
+}
+
+export interface CatalogMaterialInput {
+  name?: string;
+  categoryId?: string | null;
+  notes?: string | null;
+  unit?: string;
+  trackStock?: boolean;
+  purchaseCostMinor?: number | null;
+  lowStockThreshold?: number;
+  batchReference?: string | null;
+  /** `YYYY-MM-DD`. */
+  expiryDate?: string | null;
+  supplierName?: string | null;
+  openingQuantity?: number;
+}
+
+/** The three record kinds that carry a photo gallery, as their API paths name them. */
+export type GalleryKind = 'items' | 'services' | 'materials';
+
 export interface Category {
   id: string;
   kind: CategoryKind;
@@ -530,6 +576,33 @@ export interface PaymentEntry {
   merchantName?: string | null;
 }
 
+/** Where an order or purchase stands after one of its payments was corrected or deleted. */
+export interface PayableSummary {
+  type: PayableType;
+  id: string;
+  reference: string;
+  totalMinor: number;
+  paidMinor: number;
+  outstandingMinor: number;
+  paymentStatus: PaymentStatus;
+}
+
+/** What a payment correction may send. Only changed fields need to be included. */
+export interface PaymentCorrectionInput {
+  amountMinor?: number;
+  reference?: string | null;
+  notes?: string | null;
+  /** Why it was wrong, kept in the audit trail. */
+  reason?: string;
+}
+
+/** The delivery fields an administrator may change; null clears one. */
+export interface OrderDeliveryInput {
+  deliveryDate?: string | null;
+  deliveryTime?: string | null;
+  deliveryLocation?: string | null;
+}
+
 export interface RelationshipListQuery {
   merchantId?: string;
   search?: string;
@@ -624,6 +697,11 @@ export interface Order {
   returnedAt: string | null;
   returnedReason: string | null;
   notes: string | null;
+  /** Calendar day, `YYYY-MM-DD`. Older API versions omit the delivery fields. */
+  deliveryDate?: string | null;
+  /** 24-hour `HH:mm`. */
+  deliveryTime?: string | null;
+  deliveryLocation?: string | null;
   /** The settled state: only ever unpaid, partially paid or fully paid. */
   paymentStatus: PaymentStatus;
   /** What to display: the above with the clock folded in, so overdue needs no write. */

@@ -4,7 +4,8 @@ import { ApiError } from '../src/api/client';
 import * as endpoints from '../src/api/endpoints';
 import type { Installment, Order, PaymentEntry } from '../src/api/types';
 import { ToastProvider } from '../src/components/Toast';
-import { InstallmentPlanDrawer, OrderPaymentDrawer } from '../src/pages/OrderDrawers';
+import { DeliveryDrawer, InstallmentPlanDrawer, OrderPaymentDrawer } from '../src/pages/OrderDrawers';
+import { formatDeliveryTime, hasDelivery } from '../src/utils/orderFormat';
 
 jest.mock('../src/api/endpoints');
 
@@ -387,5 +388,93 @@ describe('InstallmentPlanDrawer', () => {
         'Payments have already been recorded against this plan, so it cannot be replaced.',
       ),
     ).toBeInTheDocument();
+  });
+});
+
+describe('DeliveryDrawer', () => {
+  const WITH_DELIVERY: Order = {
+    ...ORDER,
+    deliveryDate: '2026-11-05',
+    deliveryTime: '14:30',
+    deliveryLocation: '12 MG Road, Bengaluru',
+  };
+
+  it('prefills the three fields and sends only what changed', async () => {
+    const user = userEvent.setup();
+    const onSaved = jest.fn();
+    mocked.updateAdminOrderDelivery.mockResolvedValue({ order: { ...WITH_DELIVERY, deliveryTime: '18:00' } });
+
+    render(
+      <ToastProvider>
+        <DeliveryDrawer order={WITH_DELIVERY} onClose={jest.fn()} onSaved={onSaved} />
+      </ToastProvider>,
+    );
+
+    expect(screen.getByLabelText(/Delivery date/)).toHaveValue('2026-11-05');
+    expect(screen.getByLabelText(/Delivery location/)).toHaveValue('12 MG Road, Bengaluru');
+
+    const time = screen.getByLabelText(/Delivery time/);
+    await user.clear(time);
+    await user.type(time, '18:00');
+    await user.click(screen.getByRole('button', { name: 'Save delivery details' }));
+
+    await waitFor(() =>
+      expect(mocked.updateAdminOrderDelivery).toHaveBeenCalledWith(ORDER.id, { deliveryTime: '18:00' }),
+    );
+    expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({ deliveryTime: '18:00' }));
+  });
+
+  it('clears a field by sending null', async () => {
+    const user = userEvent.setup();
+    mocked.updateAdminOrderDelivery.mockResolvedValue({ order: { ...WITH_DELIVERY, deliveryLocation: null } });
+
+    render(
+      <ToastProvider>
+        <DeliveryDrawer order={WITH_DELIVERY} onClose={jest.fn()} onSaved={jest.fn()} />
+      </ToastProvider>,
+    );
+
+    await user.clear(screen.getByLabelText(/Delivery location/));
+    await user.click(screen.getByRole('button', { name: 'Save delivery details' }));
+
+    await waitFor(() =>
+      expect(mocked.updateAdminOrderDelivery).toHaveBeenCalledWith(ORDER.id, { deliveryLocation: null }),
+    );
+  });
+
+  it('shows the server refusing a field', async () => {
+    const user = userEvent.setup();
+    mocked.updateAdminOrderDelivery.mockRejectedValue(
+      new ApiError(422, 'VALIDATION_ERROR', 'Please correct the highlighted fields.', {
+        details: [{ field: 'deliveryTime', message: 'Enter the delivery time as HH:mm, for example 14:30.' }],
+      }),
+    );
+
+    render(
+      <ToastProvider>
+        <DeliveryDrawer order={ORDER} onClose={jest.fn()} onSaved={jest.fn()} />
+      </ToastProvider>,
+    );
+
+    await user.type(screen.getByLabelText(/Delivery location/), 'Gate 2');
+    await user.click(screen.getByRole('button', { name: 'Save delivery details' }));
+
+    expect(await screen.findByText(/Enter the delivery time as HH:mm/)).toBeInTheDocument();
+  });
+});
+
+describe('delivery formatting', () => {
+  it('reads a 24-hour time the way the panel shows times', () => {
+    expect(formatDeliveryTime('00:05')).toBe('12:05 AM');
+    expect(formatDeliveryTime('09:00')).toBe('9:00 AM');
+    expect(formatDeliveryTime('12:00')).toBe('12:00 PM');
+    expect(formatDeliveryTime('18:30')).toBe('6:30 PM');
+    expect(formatDeliveryTime(null)).toBe('—');
+  });
+
+  it('knows whether any delivery detail is set', () => {
+    expect(hasDelivery({})).toBe(false);
+    expect(hasDelivery({ deliveryDate: null, deliveryTime: null, deliveryLocation: null })).toBe(false);
+    expect(hasDelivery({ deliveryLocation: 'Gate 2' })).toBe(true);
   });
 });

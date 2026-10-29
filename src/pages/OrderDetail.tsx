@@ -20,9 +20,12 @@ import {
   lineTypeLabel,
   orderStatusLabel,
   orderStatusTone,
+  formatDeliveryTime,
+  hasDelivery,
 } from '../utils/orderFormat';
-import { paymentMethodLabel, paymentStateLabel, paymentStateTone } from '../utils/paymentFormat';
-import { InstallmentPlanDrawer, OrderPaymentDrawer } from './OrderDrawers';
+import { paymentStateLabel, paymentStateTone } from '../utils/paymentFormat';
+import { DeliveryDrawer, InstallmentPlanDrawer, OrderPaymentDrawer } from './OrderDrawers';
+import { PaymentTimeline } from './PaymentCorrection';
 
 interface OrderDetailPanelProps {
   orderId: string | null;
@@ -53,6 +56,7 @@ export function OrderDetailPanel({ orderId, onClose, onChanged }: OrderDetailPan
   const [busy, setBusy] = useState(false);
   const [paying, setPaying] = useState<Order | null>(null);
   const [planning, setPlanning] = useState<Order | null>(null);
+  const [editingDelivery, setEditingDelivery] = useState<Order | null>(null);
 
   const canEdit = can(ORDER_PERMISSIONS.ORDER_EDIT);
   const canCancel = can(ORDER_PERMISSIONS.ORDER_CANCEL);
@@ -421,38 +425,46 @@ export function OrderDetailPanel({ orderId, onClose, onChanged }: OrderDetailPan
             ) : null}
 
             <section className="stack gap-2">
-              <h3 className="text-sm text-muted text-upper">Payments</h3>
-              {payments.length === 0 ? (
-                <p className="text-sm text-muted">Nothing has been paid against this order yet.</p>
+              <div className="row-between">
+                <h3 className="text-sm text-muted text-upper">Delivery</h3>
+                {canEdit ? (
+                  <Button size="sm" variant="ghost" onClick={() => setEditingDelivery(order)}>
+                    {hasDelivery(order) ? 'Edit' : 'Add delivery details'}
+                  </Button>
+                ) : null}
+              </div>
+              {hasDelivery(order) ? (
+                <dl className="detail-grid">
+                  <div>
+                    <dt>Date</dt>
+                    <dd>{formatDate(order.deliveryDate)}</dd>
+                  </div>
+                  <div>
+                    <dt>Time</dt>
+                    <dd>{formatDeliveryTime(order.deliveryTime)}</dd>
+                  </div>
+                  <div className="detail-grid__wide">
+                    <dt>Location</dt>
+                    <dd className="text-pre-line">{order.deliveryLocation ?? '—'}</dd>
+                  </div>
+                </dl>
               ) : (
-                <ul className="timeline">
-                  {payments.map((payment) => (
-                    <li key={payment.id} className="timeline__entry">
-                      <div className="row-between">
-                        <span className="text-medium text-numeric">
-                          {formatMoneyMinor(payment.amountMinor)}
-                        </span>
-                        <span className="text-sm text-muted">{formatDateTime(payment.paidAt)}</span>
-                      </div>
-                      <div className="row gap-2 wrap text-sm text-secondary">
-                        <span>{paymentMethodLabel(payment.method)}</span>
-                        {payment.installmentNumber ? (
-                          <span>Instalment #{payment.installmentNumber}</span>
-                        ) : null}
-                        {payment.reference ? (
-                          <span className="text-mono text-xs">{payment.reference}</span>
-                        ) : null}
-                        <span>{formatMoneyMinor(payment.balanceAfterMinor)} left after this</span>
-                        {/* A merchant should be able to see that support recorded it. */}
-                        {payment.actorType === 'admin' ? (
-                          <Chip tone="info">Recorded by {payment.actorLabel}</Chip>
-                        ) : null}
-                      </div>
-                      {payment.notes ? <p className="text-sm">{payment.notes}</p> : null}
-                    </li>
-                  ))}
-                </ul>
+                <p className="text-sm text-muted">No delivery date, time or location set.</p>
               )}
+            </section>
+
+            <section className="stack gap-2">
+              <h3 className="text-sm text-muted text-upper">Payments</h3>
+              <PaymentTimeline
+                payments={payments}
+                emptyText="Nothing has been paid against this order yet."
+                canManage={canPay}
+                outstandingMinor={order.outstandingMinor}
+                onChanged={() => {
+                  onChanged();
+                  if (order) void load(order.id);
+                }}
+              />
             </section>
 
             {order.notes ? (
@@ -506,6 +518,15 @@ export function OrderDetailPanel({ orderId, onClose, onChanged }: OrderDetailPan
         onRecorded={(result) => {
           setOrder(result.order);
           setPayments((current) => [result.payment, ...current]);
+          onChanged();
+        }}
+      />
+
+      <DeliveryDrawer
+        order={editingDelivery}
+        onClose={() => setEditingDelivery(null)}
+        onSaved={(updated) => {
+          setOrder(updated);
           onChanged();
         }}
       />

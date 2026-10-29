@@ -21,13 +21,13 @@ import type {
 } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import { CATALOG_PERMISSIONS } from '../auth/permissions';
-import { IconButton } from '../components/Button';
+import { Button, IconButton } from '../components/Button';
 import { CatalogToolbar, StockCell, StockStatusCell } from '../components/CatalogToolbar';
 import { CatalogDeleteDialog, type DeletableRecord } from './CatalogDeleteDialog';
 import { Chip } from '../components/Chip';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { DataTable, type Column } from '../components/DataTable';
-import { EditIcon, ShieldOffIcon, SortIcon, TrashIcon } from '../components/Icon';
+import { EditIcon, PlusIcon, ShieldOffIcon, SortIcon, TrashIcon } from '../components/Icon';
 import { PageHeader } from '../components/PageHeader';
 import { Pagination } from '../components/Pagination';
 import { useToast } from '../components/Toast';
@@ -44,7 +44,7 @@ import {
 } from '../utils/format';
 import { useCatalogList } from '../utils/useCatalogList';
 import { useCatalogMeta } from '../utils/useCatalogMeta';
-import { ItemEditDrawer, MaterialEditDrawer, ServiceEditDrawer } from './CatalogDrawers';
+import { MaterialFormDrawer, ProductFormDrawer, ServiceFormDrawer, type FormTarget } from './CatalogForms';
 import { StockAdjustDrawer, type StockSubject } from './StockAdjustDrawer';
 import { NameWithThumb } from '../components/CatalogImages';
 
@@ -70,17 +70,74 @@ function ArchivedChip({ archived }: { archived: boolean }) {
 
 /* ---------------------------------- items --------------------------------- */
 
-export function ItemsPage() {
+
+/** A list page shown inside one merchant's page instead of across every merchant. */
+export interface MerchantScope {
+  merchantId: string;
+  merchantName: string;
+}
+
+/**
+ * The top of a catalog list: the page header across all merchants, or a compact heading
+ * inside a merchant's page. Either way it carries the "Add" action.
+ */
+function ListHeading({
+  scope,
+  title,
+  description,
+  total,
+  loading,
+  addLabel,
+  onAdd,
+}: {
+  scope?: MerchantScope;
+  title: string;
+  description: string;
+  total: number;
+  loading: boolean;
+  addLabel: string;
+  onAdd: (() => void) | null;
+}) {
+  const action = onAdd ? (
+    <Button icon={<PlusIcon />} onClick={onAdd}>
+      {addLabel}
+    </Button>
+  ) : null;
+
+  if (scope) {
+    return (
+      <div className="row-between scoped-heading">
+        <div className="row gap-2">
+          <h3 className="card__title">{title}</h3>
+          {loading ? null : <Chip tone="brand">{total} total</Chip>}
+        </div>
+        {action}
+      </div>
+    );
+  }
+
+  return (
+    <PageHeader
+      title={title}
+      description={description}
+      badge={loading ? null : <Chip tone="brand">{total} total</Chip>}
+      {...(action ? { actions: action } : {})}
+    />
+  );
+}
+
+export function ItemsPage({ scope }: { scope?: MerchantScope } = {}) {
   // Subscribes to the unit catalogue so quantity labels follow admin edits.
   useCatalogMeta();
   const { can } = useAuth();
   const toast = useToast();
   const list = useCatalogList<CatalogItem>(
     useCallback((query, signal) => fetchAdminItems(query, signal) as Promise<Paginated<CatalogItem>>, []),
+  { ...(scope ? { merchantId: scope.merchantId } : {}) },
   );
 
   const canDelete = can(CATALOG_PERMISSIONS.ITEM_DELETE);
-  const [editing, setEditing] = useState<CatalogItem | null>(null);
+  const [form, setForm] = useState<FormTarget<CatalogItem>>(null);
   const [adjusting, setAdjusting] = useState<StockSubject | null>(null);
   const [deleting, setDeleting] = useState<DeletableRecord | null>(null);
   const [archiving, setArchiving] = useState<CatalogItem | null>(null);
@@ -174,10 +231,14 @@ export function ItemsPage() {
 
   return (
     <>
-      <PageHeader
+      <ListHeading
+        {...(scope ? { scope } : {})}
         title="Products"
         description="Physical things merchants sell. Stock changes only through an adjustment, never through an edit."
-        badge={list.loading ? null : <Chip tone="brand">{list.meta.total} total</Chip>}
+        total={list.meta.total}
+        loading={list.loading}
+        addLabel="Add product"
+        onAdd={canManage ? () => setForm({ mode: 'create', ...(scope ? { merchantId: scope.merchantId, merchantName: scope.merchantName } : {}) }) : null}
       />
 
       <section className="card">
@@ -195,7 +256,7 @@ export function ItemsPage() {
 
         <DataTable
           caption="Products across all merchants"
-          columns={columns}
+          columns={scope ? columns.filter((column) => column.key !== 'merchant') : columns}
           rows={list.rows}
           rowKey={(item) => item.id}
           loading={list.loading}
@@ -221,7 +282,7 @@ export function ItemsPage() {
                       <IconButton
                         label={`Edit ${item.name}`}
                         icon={<EditIcon />}
-                        onClick={() => setEditing(item)}
+                        onClick={() => setForm({ mode: 'edit', record: item })}
                       />
                     ) : null}
                     {canAdjust && item.trackStock && !item.archived ? (
@@ -256,7 +317,11 @@ export function ItemsPage() {
         ) : null}
       </section>
 
-      <ItemEditDrawer item={editing} onClose={() => setEditing(null)} onSaved={list.applyRow} />
+      <ProductFormDrawer
+        target={form}
+        onClose={() => setForm(null)}
+        onSaved={(saved, created) => (created ? list.reload() : list.applyRow(saved))}
+      />
 
       <StockAdjustDrawer
         subject={adjusting}
@@ -292,7 +357,7 @@ export function ItemsPage() {
 
 /* -------------------------------- services -------------------------------- */
 
-export function ServicesPage() {
+export function ServicesPage({ scope }: { scope?: MerchantScope } = {}) {
   const { can } = useAuth();
   const toast = useToast();
   const list = useCatalogList<CatalogService>(
@@ -300,10 +365,11 @@ export function ServicesPage() {
       (query, signal) => fetchAdminServices(query, signal) as Promise<Paginated<CatalogService>>,
       [],
     ),
+  { ...(scope ? { merchantId: scope.merchantId } : {}) },
   );
 
   const canDelete = can(CATALOG_PERMISSIONS.SERVICE_DELETE);
-  const [editing, setEditing] = useState<CatalogService | null>(null);
+  const [form, setForm] = useState<FormTarget<CatalogService>>(null);
   const [deleting, setDeleting] = useState<DeletableRecord | null>(null);
   const [archiving, setArchiving] = useState<CatalogService | null>(null);
   const [busy, setBusy] = useState(false);
@@ -387,10 +453,14 @@ export function ServicesPage() {
 
   return (
     <>
-      <PageHeader
+      <ListHeading
+        {...(scope ? { scope } : {})}
         title="Services"
         description="Work merchants sell by time, session, unit or package. A service never carries stock."
-        badge={list.loading ? null : <Chip tone="brand">{list.meta.total} total</Chip>}
+        total={list.meta.total}
+        loading={list.loading}
+        addLabel="Add service"
+        onAdd={canManage ? () => setForm({ mode: 'create', ...(scope ? { merchantId: scope.merchantId, merchantName: scope.merchantName } : {}) }) : null}
       />
 
       <section className="card">
@@ -407,7 +477,7 @@ export function ServicesPage() {
 
         <DataTable
           caption="Services across all merchants"
-          columns={columns}
+          columns={scope ? columns.filter((column) => column.key !== 'merchant') : columns}
           rows={list.rows}
           rowKey={(service) => service.id}
           loading={list.loading}
@@ -432,7 +502,7 @@ export function ServicesPage() {
                     <IconButton
                       label={`Edit ${service.name}`}
                       icon={<EditIcon />}
-                      onClick={() => setEditing(service)}
+                      onClick={() => setForm({ mode: 'edit', record: service })}
                     />
                     <IconButton
                       label={`${service.archived ? 'Restore' : 'Archive'} ${service.name}`}
@@ -462,7 +532,11 @@ export function ServicesPage() {
         ) : null}
       </section>
 
-      <ServiceEditDrawer service={editing} onClose={() => setEditing(null)} onSaved={list.applyRow} />
+      <ServiceFormDrawer
+        target={form}
+        onClose={() => setForm(null)}
+        onSaved={(saved, created) => (created ? list.reload() : list.applyRow(saved))}
+      />
 
       <ConfirmDialog
         open={archiving !== null}
@@ -491,7 +565,7 @@ export function ServicesPage() {
 
 /* -------------------------------- materials ------------------------------- */
 
-export function MaterialsPage() {
+export function MaterialsPage({ scope }: { scope?: MerchantScope } = {}) {
   // Subscribes to the unit catalogue so quantity labels follow admin edits.
   useCatalogMeta();
   const { can } = useAuth();
@@ -501,10 +575,11 @@ export function MaterialsPage() {
       (query, signal) => fetchAdminMaterials(query, signal) as Promise<Paginated<CatalogMaterial>>,
       [],
     ),
+  { ...(scope ? { merchantId: scope.merchantId } : {}) },
   );
 
   const canDelete = can(CATALOG_PERMISSIONS.MATERIAL_DELETE);
-  const [editing, setEditing] = useState<CatalogMaterial | null>(null);
+  const [form, setForm] = useState<FormTarget<CatalogMaterial>>(null);
   const [adjusting, setAdjusting] = useState<StockSubject | null>(null);
   const [deleting, setDeleting] = useState<DeletableRecord | null>(null);
   const [archiving, setArchiving] = useState<CatalogMaterial | null>(null);
@@ -606,10 +681,14 @@ export function MaterialsPage() {
 
   return (
     <>
-      <PageHeader
+      <ListHeading
+        {...(scope ? { scope } : {})}
         title="Raw materials"
         description="Inputs merchants buy before making or selling something."
-        badge={list.loading ? null : <Chip tone="brand">{list.meta.total} total</Chip>}
+        total={list.meta.total}
+        loading={list.loading}
+        addLabel="Add raw material"
+        onAdd={canManage ? () => setForm({ mode: 'create', ...(scope ? { merchantId: scope.merchantId, merchantName: scope.merchantName } : {}) }) : null}
       />
 
       <section className="card">
@@ -627,7 +706,7 @@ export function MaterialsPage() {
 
         <DataTable
           caption="Raw materials across all merchants"
-          columns={columns}
+          columns={scope ? columns.filter((column) => column.key !== 'merchant') : columns}
           rows={list.rows}
           rowKey={(material) => material.id}
           loading={list.loading}
@@ -656,7 +735,7 @@ export function MaterialsPage() {
                       <IconButton
                         label={`Edit ${material.name}`}
                         icon={<EditIcon />}
-                        onClick={() => setEditing(material)}
+                        onClick={() => setForm({ mode: 'edit', record: material })}
                       />
                     ) : null}
                     {canAdjust && material.trackStock && !material.archived ? (
@@ -696,7 +775,11 @@ export function MaterialsPage() {
         ) : null}
       </section>
 
-      <MaterialEditDrawer material={editing} onClose={() => setEditing(null)} onSaved={list.applyRow} />
+      <MaterialFormDrawer
+        target={form}
+        onClose={() => setForm(null)}
+        onSaved={(saved, created) => (created ? list.reload() : list.applyRow(saved))}
+      />
 
       <StockAdjustDrawer
         subject={adjusting}

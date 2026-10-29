@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { ApiError } from '../api/client';
-import { recordAdminOrderPayment, setAdminInstallmentPlan } from '../api/endpoints';
+import { recordAdminOrderPayment, setAdminInstallmentPlan, updateAdminOrderDelivery } from '../api/endpoints';
 import type {
   Installment,
   InstallmentInput,
   Order,
+  OrderDeliveryInput,
   PaymentEntry,
   PaymentMethod,
 } from '../api/types';
@@ -498,6 +499,122 @@ export function InstallmentPlanDrawer({ order, onClose, onSaved }: InstallmentPl
             .
           </p>
         ) : null}
+      </form>
+    </Drawer>
+  );
+}
+
+/* ------------------------------ delivery details ---------------------------- */
+
+interface DeliveryDrawerProps {
+  order: Order | null;
+  onClose: () => void;
+  onSaved: (order: Order) => void;
+}
+
+/**
+ * Changes when and where an order is delivered. Three separate fields, each of which
+ * can be left blank; only the ones that changed are sent.
+ */
+export function DeliveryDrawer({ order, onClose, onSaved }: DeliveryDrawerProps) {
+  const toast = useToast();
+  const [date, setDate] = useState('');
+  const [time, setTime] = useState('');
+  const [location, setLocation] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!order) return;
+    setDate(order.deliveryDate ?? '');
+    setTime(order.deliveryTime ?? '');
+    setLocation(order.deliveryLocation ?? '');
+    setFieldErrors({});
+    setFormError(null);
+  }, [order]);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!order || saving) return;
+
+    const input: OrderDeliveryInput = {};
+    if (date !== (order.deliveryDate ?? '')) input.deliveryDate = date || null;
+    if (time !== (order.deliveryTime ?? '')) input.deliveryTime = time || null;
+    if (location.trim() !== (order.deliveryLocation ?? '')) input.deliveryLocation = location.trim() || null;
+    if (Object.keys(input).length === 0) {
+      onClose();
+      return;
+    }
+
+    setSaving(true);
+    setFieldErrors({});
+    setFormError(null);
+    try {
+      const result = await updateAdminOrderDelivery(order.id, input);
+      toast.success(`Delivery details updated for ${order.reference}`);
+      onSaved(result.order);
+      onClose();
+    } catch (error) {
+      setFieldErrors(fieldErrorsFrom(error));
+      setFormError(messageFrom(error, 'Could not save the delivery details. Please try again.'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Drawer
+      open={Boolean(order)}
+      title="Delivery details"
+      {...(order ? { description: `${order.reference} · ${order.customerName ?? 'Walk-in sale'}` } : {})}
+      busy={saving}
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button type="submit" form="order-delivery-form" loading={saving}>
+            Save delivery details
+          </Button>
+        </>
+      }
+    >
+      <form id="order-delivery-form" className="form" onSubmit={submit} noValidate>
+        {formError ? <InlineAlert tone="error">{formError}</InlineAlert> : null}
+
+        <div className="field-grid">
+          <TextField
+            label="Delivery date"
+            type="date"
+            optional
+            value={date}
+            onChange={(event) => setDate(event.target.value)}
+            {...(fieldErrors.deliveryDate ? { error: fieldErrors.deliveryDate } : {})}
+            disabled={saving}
+          />
+          <TextField
+            label="Delivery time"
+            type="time"
+            optional
+            value={time}
+            onChange={(event) => setTime(event.target.value)}
+            {...(fieldErrors.deliveryTime ? { error: fieldErrors.deliveryTime } : {})}
+            disabled={saving}
+          />
+        </div>
+
+        <TextField
+          label="Delivery location"
+          optional
+          hint="The full address, with a landmark if it helps."
+          value={location}
+          maxLength={500}
+          onChange={(event) => setLocation(event.target.value)}
+          {...(fieldErrors.deliveryLocation ? { error: fieldErrors.deliveryLocation } : {})}
+          disabled={saving}
+        />
       </form>
     </Drawer>
   );

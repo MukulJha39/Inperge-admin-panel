@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { ApiError } from '../api/client';
-import { adjustStock } from '../api/endpoints';
+import { adjustStock, setAdminStockQuantity } from '../api/endpoints';
 import type {
   CatalogItem,
   CatalogMaterial,
@@ -32,7 +32,8 @@ interface StockAdjustDrawerProps {
   onAdjusted: (updated: CatalogItem | CatalogMaterial) => void;
 }
 
-type Direction = 'remove' | 'add';
+/** Down, up, or straight to a counted figure (a recount). */
+type Direction = 'remove' | 'add' | 'set';
 
 /**
  * Records a stock correction on a merchant's behalf.
@@ -66,6 +67,7 @@ export function StockAdjustDrawer({ subject, onClose, onAdjusted }: StockAdjustD
     if (!subject) return null;
     const parsed = Number(amount);
     if (!amount.trim() || Number.isNaN(parsed)) return null;
+    if (direction === 'set') return parsed;
     return subject.quantity + (direction === 'add' ? parsed : -parsed);
   }, [subject, amount, direction]);
 
@@ -75,9 +77,12 @@ export function StockAdjustDrawer({ subject, onClose, onAdjusted }: StockAdjustD
     const errors: Record<string, string> = {};
     const parsed = Number(amount);
 
-    if (!amount.trim()) errors.amount = 'Enter how much stock changed.';
-    else if (Number.isNaN(parsed)) errors.amount = 'Enter a number.';
-    else if (parsed <= 0) errors.amount = 'Enter an amount greater than zero.';
+    if (!amount.trim()) {
+      errors.amount = direction === 'set' ? 'Enter the quantity you counted.' : 'Enter how much stock changed.';
+    } else if (Number.isNaN(parsed)) errors.amount = 'Enter a number.';
+    else if (direction === 'set' ? parsed < 0 : parsed <= 0) {
+      errors.amount = direction === 'set' ? 'Enter zero or more.' : 'Enter an amount greater than zero.';
+    }
     else if (Math.abs(parsed * 1000 - Math.round(parsed * 1000)) > 1e-6) {
       errors.amount = 'Use at most three decimal places.';
     } else if (direction === 'remove' && parsed > subject!.quantity) {
@@ -99,12 +104,18 @@ export function StockAdjustDrawer({ subject, onClose, onAdjusted }: StockAdjustD
 
     setSaving(true);
     try {
-      const change = direction === 'add' ? Number(amount) : -Number(amount);
-      const result = await adjustStock(subject.subjectType, subject.id, {
-        change,
-        reason,
-        ...(note.trim() ? { note: note.trim() } : {}),
-      });
+      const result =
+        direction === 'set'
+          ? await setAdminStockQuantity(subject.subjectType, subject.id, {
+              quantity: Number(amount),
+              reason,
+              ...(note.trim() ? { note: note.trim() } : {}),
+            })
+          : await adjustStock(subject.subjectType, subject.id, {
+              change: direction === 'add' ? Number(amount) : -Number(amount),
+              reason,
+              ...(note.trim() ? { note: note.trim() } : {}),
+            });
 
       const updated = result.item ?? result.material;
       if (updated) onAdjusted(updated);
@@ -141,7 +152,7 @@ export function StockAdjustDrawer({ subject, onClose, onAdjusted }: StockAdjustD
             Cancel
           </Button>
           <Button variant="primary" form="stock-adjust-form" type="submit" loading={saving}>
-            Record adjustment
+            {direction === 'set' ? 'Save count' : 'Record adjustment'}
           </Button>
         </>
       }
@@ -159,13 +170,19 @@ export function StockAdjustDrawer({ subject, onClose, onAdjusted }: StockAdjustD
           options={[
             { value: 'remove', label: 'Stock went down' },
             { value: 'add', label: 'Stock went up' },
+            { value: 'set', label: 'Set to a counted figure' },
           ]}
           value={direction}
-          onChange={(event) => setDirection(event.target.value as Direction)}
+          onChange={(event) => {
+            const next = event.target.value as Direction;
+            setDirection(next);
+            // A count is a recount unless the administrator says otherwise.
+            if (next === 'set') setReason('recount');
+          }}
         />
 
         <TextField
-          label={`Amount in ${unitLabel(subject.unit)}`}
+          label={`${direction === 'set' ? 'Counted quantity' : 'Amount'} in ${unitLabel(subject.unit)}`}
           type="number"
           step="0.001"
           min="0"

@@ -5,7 +5,6 @@ import type {
   AdminMember,
   AdminStatus,
   RoleInput,
-  BillingUnit,
   Business,
   CatalogItem,
   CatalogListQuery,
@@ -27,6 +26,13 @@ import type {
   MerchantStatus,
   Paginated,
   PayableType,
+  PayableSummary,
+  CatalogItemInput,
+  CategoryKind,
+  CatalogMaterialInput,
+  CatalogServiceInput,
+  GalleryKind,
+  PaymentCorrectionInput,
   PaymentEntry,
   PaymentMethod,
   PermissionGroup,
@@ -41,6 +47,7 @@ import type {
   AdminReceivable,
   InstallmentInput,
   Order,
+  OrderDeliveryInput,
   OrderListQuery,
   OrderStatus,
   OrderSummary,
@@ -259,47 +266,89 @@ export function fetchAdminStockMovements(
  */
 export function updateAdminItem(
   id: string,
-  input: {
-    name?: string;
-    sku?: string | null;
-    unit?: string;
-    sellingPriceMinor?: number;
-    costPriceMinor?: number | null;
-    lowStockThreshold?: number;
-    categoryId?: string | null;
-    description?: string | null;
-  },
+  input: CatalogItemInput,
 ) {
   return api.patch<{ item: CatalogItem }>(`/admin/items/${id}`, input);
 }
 
 export function updateAdminService(
   id: string,
-  input: {
-    name?: string;
-    billingUnit?: BillingUnit;
-    rateMinor?: number;
-    durationMinutes?: number | null;
-    isActive?: boolean;
-    description?: string | null;
-  },
+  input: CatalogServiceInput,
 ) {
   return api.patch<{ service: CatalogService }>(`/admin/services/${id}`, input);
 }
 
 export function updateAdminMaterial(
   id: string,
-  input: {
-    name?: string;
-    unit?: string;
-    purchaseCostMinor?: number | null;
-    lowStockThreshold?: number;
-    batchReference?: string | null;
-    supplierName?: string | null;
-    notes?: string | null;
-  },
+  input: CatalogMaterialInput,
 ) {
   return api.patch<{ material: CatalogMaterial }>(`/admin/materials/${id}`, input);
+}
+
+/* ---- acting for a merchant: create, categories, photos, recount ---- */
+
+/** Creates a product in a merchant's catalog, as if they had added it in the app. */
+export function createAdminItem(merchantId: string, input: CatalogItemInput) {
+  return api.post<{ item: CatalogItem }>(`/admin/merchants/${merchantId}/items`, input);
+}
+
+export function createAdminService(merchantId: string, input: CatalogServiceInput) {
+  return api.post<{ service: CatalogService }>(`/admin/merchants/${merchantId}/services`, input);
+}
+
+export function createAdminMaterial(merchantId: string, input: CatalogMaterialInput) {
+  return api.post<{ material: CatalogMaterial }>(`/admin/merchants/${merchantId}/materials`, input);
+}
+
+export function createAdminCategory(merchantId: string, input: { kind: CategoryKind; name: string }) {
+  return api.post<{ category: Category }>(`/admin/merchants/${merchantId}/categories`, input);
+}
+
+export function renameAdminCategory(id: string, name: string) {
+  return api.patch<{ category: Category }>(`/admin/categories/${id}`, { name });
+}
+
+export function setAdminCategoryArchived(id: string, archived: boolean) {
+  return api.post<{ category: Category }>(`/admin/categories/${id}/${archived ? 'archive' : 'restore'}`);
+}
+
+type GalleryRecord = CatalogItem | CatalogService | CatalogMaterial;
+const GALLERY_KEY = { items: 'item', services: 'service', materials: 'material' } as const;
+
+async function galleryResult(kind: GalleryKind, promise: Promise<Record<string, GalleryRecord>>) {
+  const data = await promise;
+  return data[GALLERY_KEY[kind]] as GalleryRecord;
+}
+
+/** Uploads photos to a record's gallery. Returns the record with its new gallery. */
+export function uploadAdminImages(kind: GalleryKind, id: string, files: File[]) {
+  const form = new FormData();
+  for (const file of files) form.append('images', file);
+  return galleryResult(kind, api.post<Record<string, GalleryRecord>>(`/admin/${kind}/${id}/images`, form));
+}
+
+export function removeAdminImage(kind: GalleryKind, id: string, imageId: string) {
+  return galleryResult(kind, api.delete<Record<string, GalleryRecord>>(`/admin/${kind}/${id}/images/${imageId}`));
+}
+
+/** Puts the gallery in this order; the first photo becomes the cover. */
+export function reorderAdminImages(kind: GalleryKind, id: string, imageIds: string[]) {
+  return galleryResult(
+    kind,
+    api.put<Record<string, GalleryRecord>>(`/admin/${kind}/${id}/images/order`, { imageIds }),
+  );
+}
+
+/** Sets stock to a counted figure, recorded in the ledger as a recount. */
+export function setAdminStockQuantity(
+  subjectType: StockSubjectType,
+  subjectId: string,
+  input: { quantity: number; reason?: StockAdjustmentReason; note?: string },
+) {
+  return api.put<{ item?: CatalogItem; material?: CatalogMaterial; movement: StockMovement }>(
+    `/admin/stock/${subjectType}/${subjectId}/quantity`,
+    input,
+  );
 }
 
 export function setAdminItemArchived(id: string, archived: boolean) {
@@ -486,6 +535,11 @@ export function cancelAdminPurchase(id: string, reason?: string) {
   });
 }
 
+/** Changes only an order's delivery date, time and location. */
+export function updateAdminOrderDelivery(id: string, input: OrderDeliveryInput) {
+  return api.patch<{ order: Order }>(`/admin/orders/${id}/delivery`, input);
+}
+
 /** Goes through the same payment engine a merchant uses, recorded as an admin action. */
 export function recordAdminPurchasePayment(
   id: string,
@@ -580,6 +634,22 @@ export function recordAdminOrderPayment(
   },
 ) {
   return api.post<{ payment: PaymentEntry; order: Order }>(`/admin/orders/${id}/payments`, input);
+}
+
+/**
+ * Fixes a payment entered with the wrong amount (or a wrong reference or note). The
+ * server rebuilds the order or purchase from its payments and returns where it stands.
+ */
+export function correctAdminPayment(id: string, input: PaymentCorrectionInput) {
+  return api.patch<{ payment: PaymentEntry; payable: PayableSummary }>(`/admin/payments/${id}`, input);
+}
+
+/** Deletes a payment recorded by mistake. The reason goes in the query: a DELETE carries no body here. */
+export function deleteAdminPayment(id: string, reason?: string) {
+  return api.delete<{ deleted: true; payment: PaymentEntry; payable: PayableSummary }>(
+    `/admin/payments/${id}`,
+    { query: { reason: reason?.trim() || undefined } },
+  );
 }
 
 /** A plan is replaced wholesale, because it has to add up to the order total. */

@@ -11,7 +11,8 @@ import { Drawer } from '../components/Drawer';
 import { DetailSkeleton, ErrorState, InlineAlert } from '../components/States';
 import { useToast } from '../components/Toast';
 import { formatDate, formatDateTime, formatMoneyMinor, formatQuantity } from '../utils/format';
-import { paymentMethodLabel, paymentStateLabel, paymentStateTone } from '../utils/paymentFormat';
+import { paymentStateLabel, paymentStateTone } from '../utils/paymentFormat';
+import { PaymentTimeline } from './PaymentCorrection';
 import { PaymentDrawer } from './RelationshipDrawers';
 
 interface PurchaseDetailPanelProps {
@@ -266,36 +267,16 @@ export function PurchaseDetailPanel({
 
             <section className="stack gap-2">
               <h3 className="text-sm text-muted text-upper">Payments</h3>
-              {payments.length === 0 ? (
-                <p className="text-sm text-muted">Nothing has been paid against this purchase yet.</p>
-              ) : (
-                <ul className="timeline">
-                  {payments.map((payment) => (
-                    <li key={payment.id} className="timeline__entry">
-                      <div className="row-between">
-                        <span className="text-medium text-numeric">
-                          {formatMoneyMinor(payment.amountMinor)}
-                        </span>
-                        <span className="text-sm text-muted">{formatDateTime(payment.paidAt)}</span>
-                      </div>
-                      <div className="row gap-2 wrap text-sm text-secondary">
-                        <span>{paymentMethodLabel(payment.method)}</span>
-                        {payment.reference ? (
-                          <span className="text-mono text-xs">{payment.reference}</span>
-                        ) : null}
-                        <span>
-                          {formatMoneyMinor(payment.balanceAfterMinor)} left after this
-                        </span>
-                        {/* A merchant should be able to see that support recorded it. */}
-                        {payment.actorType === 'admin' ? (
-                          <Chip tone="info">Recorded by {payment.actorLabel}</Chip>
-                        ) : null}
-                      </div>
-                      {payment.notes ? <p className="text-sm">{payment.notes}</p> : null}
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <PaymentTimeline
+                payments={payments}
+                emptyText="Nothing has been paid against this purchase yet."
+                canManage={canPay}
+                outstandingMinor={Math.max(0, purchase.totalMinor - purchase.paidMinor)}
+                onChanged={() => {
+                  onChanged();
+                  if (purchase) void load(purchase.id);
+                }}
+              />
             </section>
 
             {purchase.notes ? (

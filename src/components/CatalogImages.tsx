@@ -2,12 +2,13 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { CatalogImage } from '../api/types';
 import { useFocusTrap } from '../utils/useFocusTrap';
-import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, ExternalLinkIcon, ImageIcon } from './Icon';
+import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, ExternalLinkIcon, ImageIcon, PlusIcon, TrashIcon } from './Icon';
 
 /**
- * Photos merchants add to products, services and raw materials from the app. The admin panel
- * only displays them: a thumbnail in lists, a gallery in the edit drawer, and a
- * full-size viewer for both.
+ * Photos of products, services and raw materials. Merchants add them from the app, and
+ * support can manage them on a merchant's behalf: a thumbnail in lists, a gallery in the
+ * edit drawer (editable where the administrator may manage the record), and a full-size
+ * viewer for both.
  */
 
 interface WithImages {
@@ -253,6 +254,222 @@ export function ImageGallery({ record, name }: { record: WithImages; name: strin
       {viewing !== null ? (
         <ImageViewer images={images} startIndex={viewing} title={name} onClose={() => setViewing(null)} />
       ) : null}
+    </section>
+  );
+}
+
+/* ------------------------------ managing photos ----------------------------- */
+
+/** The most photos a record can carry, matching the API. */
+export const MAX_IMAGES = 8;
+const ACCEPTED = ['image/png', 'image/jpeg', 'image/webp'];
+const MAX_BYTES = 5 * 1024 * 1024;
+
+/** Checks files before they are sent, so a wrong pick is explained without a round trip. */
+export function checkImageFiles(files: File[], room: number): string | null {
+  if (files.length > room) {
+    return room === 0
+      ? `This already has ${MAX_IMAGES} photos. Remove one before adding another.`
+      : `You can add ${room} more photo${room === 1 ? '' : 's'}.`;
+  }
+  if (files.some((file) => !ACCEPTED.includes(file.type))) return 'Choose PNG, JPG or WebP images.';
+  if (files.some((file) => file.size > MAX_BYTES)) return 'Each photo must be smaller than 5 MB.';
+  return null;
+}
+
+function AddPhotosTile({ disabled, onPick }: { disabled: boolean; onPick: (files: File[]) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  return (
+    <li className="gallery__cell">
+      <button
+        type="button"
+        className="gallery__tile gallery__tile--add"
+        disabled={disabled}
+        onClick={() => inputRef.current?.click()}
+      >
+        <PlusIcon size={18} />
+        <span>Add photos</span>
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={ACCEPTED.join(',')}
+        multiple
+        hidden
+        aria-label="Choose photos to upload"
+        onChange={(event) => {
+          const files = Array.from(event.target.files ?? []);
+          event.target.value = '';
+          if (files.length > 0) onPick(files);
+        }}
+      />
+    </li>
+  );
+}
+
+interface ImageManagerProps {
+  record: WithImages;
+  name: string;
+  onUpload: (files: File[]) => Promise<void>;
+  onRemove: (image: CatalogImage) => Promise<void>;
+  onMakeCover: (image: CatalogImage) => Promise<void>;
+}
+
+/**
+ * An editable gallery: add photos, choose the cover, remove one. Each action is saved
+ * straight away, as it is in the merchant app, and the parent receives the updated record.
+ */
+export function ImageManager({ record, name, onUpload, onRemove, onMakeCover }: ImageManagerProps) {
+  const images = imagesOf(record);
+  const [viewing, setViewing] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  async function run(action: () => Promise<void>) {
+    setBusy(true);
+    setProblem(null);
+    try {
+      await action();
+    } catch (error) {
+      setProblem(error instanceof Error ? error.message : 'That did not work. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="gallery" aria-label="Photos" aria-busy={busy}>
+      <div className="gallery__head">
+        <span className="field__label">Photos</span>
+        <span className="text-xs text-secondary">
+          {images.length} of {MAX_IMAGES}
+          {busy ? ' · saving…' : ''}
+        </span>
+      </div>
+
+      <ul className="gallery__grid">
+        {images.map((image, index) => (
+          <li key={image.id} className="gallery__cell" style={{ animationDelay: `${index * 40}ms` }}>
+            <button
+              type="button"
+              className="gallery__tile"
+              aria-label={`View photo ${index + 1} of ${images.length}`}
+              onClick={() => setViewing(index)}
+            >
+              <img src={image.thumbnailUrl} alt="" loading="lazy" />
+              {image.isCover ? <span className="gallery__badge">Cover</span> : null}
+            </button>
+            <span className="gallery__tools">
+              {!image.isCover ? (
+                <button
+                  type="button"
+                  className="gallery__tool"
+                  disabled={busy}
+                  onClick={() => void run(() => onMakeCover(image))}
+                >
+                  Make cover
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="gallery__tool gallery__tool--danger"
+                aria-label={`Remove photo ${index + 1}`}
+                disabled={busy}
+                onClick={() => void run(() => onRemove(image))}
+              >
+                <TrashIcon size={13} />
+              </button>
+            </span>
+          </li>
+        ))}
+        {images.length < MAX_IMAGES ? (
+          <AddPhotosTile
+            disabled={busy}
+            onPick={(files) => {
+              const issue = checkImageFiles(files, MAX_IMAGES - images.length);
+              if (issue) setProblem(issue);
+              else void run(() => onUpload(files));
+            }}
+          />
+        ) : null}
+      </ul>
+
+      {problem ? (
+        <span className="field__error" role="alert">
+          {problem}
+        </span>
+      ) : (
+        <span className="field__hint">PNG, JPG or WebP, up to 5 MB each. The first photo is the cover.</span>
+      )}
+
+      {viewing !== null && images.length > 0 ? (
+        <ImageViewer images={images} startIndex={viewing} title={name} onClose={() => setViewing(null)} />
+      ) : null}
+    </section>
+  );
+}
+
+/** Photos chosen before a record exists; they are uploaded right after it is created. */
+export function PhotoPicker({ files, onChange }: { files: File[]; onChange: (files: File[]) => void }) {
+  const [previews, setPreviews] = useState<string[]>([]);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  useEffect(() => {
+    const canPreview = typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function';
+    const urls = canPreview ? files.map((file) => URL.createObjectURL(file)) : files.map(() => '');
+    setPreviews(urls);
+    return () => {
+      if (canPreview) urls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [files]);
+
+  return (
+    <section className="gallery" aria-label="Photos">
+      <div className="gallery__head">
+        <span className="field__label">
+          Photos <span className="field__optional">Optional</span>
+        </span>
+        <span className="text-xs text-secondary">
+          {files.length} of {MAX_IMAGES}
+        </span>
+      </div>
+      <ul className="gallery__grid">
+        {files.map((file, index) => (
+          <li key={`${file.name}-${index}`} className="gallery__cell">
+            <span className="gallery__tile">
+              {previews[index] ? <img src={previews[index]} alt="" /> : null}
+              {index === 0 ? <span className="gallery__badge">Cover</span> : null}
+            </span>
+            <span className="gallery__tools">
+              <button
+                type="button"
+                className="gallery__tool gallery__tool--danger"
+                aria-label={`Remove ${file.name}`}
+                onClick={() => onChange(files.filter((_, position) => position !== index))}
+              >
+                <TrashIcon size={13} />
+              </button>
+            </span>
+          </li>
+        ))}
+        {files.length < MAX_IMAGES ? (
+          <AddPhotosTile
+            disabled={false}
+            onPick={(picked) => {
+              const issue = checkImageFiles(picked, MAX_IMAGES - files.length);
+              setProblem(issue);
+              if (!issue) onChange([...files, ...picked]);
+            }}
+          />
+        ) : null}
+      </ul>
+      {problem ? (
+        <span className="field__error" role="alert">
+          {problem}
+        </span>
+      ) : (
+        <span className="field__hint">Uploaded once the record is saved. The first photo is the cover.</span>
+      )}
     </section>
   );
 }
