@@ -116,7 +116,7 @@ export function ImageViewer({ images, startIndex, title, onClose }: ImageViewerP
               key={image.id}
               className={`viewer__image viewer__image--${direction}`}
               src={image.url}
-              alt={`${title}, photo ${index + 1} of ${count}`}
+              alt={`${title} (${index + 1} of ${count})`}
               onLoad={() => setLoaded(true)}
               onError={() => setLoaded(true)}
             />

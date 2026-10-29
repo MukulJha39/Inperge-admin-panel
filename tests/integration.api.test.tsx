@@ -24,7 +24,7 @@ import { App } from '../src/App';
 import { tokenStore } from '../src/api/client';
 import type { Tokens } from '../src/api/types';
 
-const API_BASE = process.env.API_BASE_URL || 'http://localhost:4100/api/v1';
+const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:4100/api/v1';
 const PASSWORD = process.env.SEED_PASSWORD || 'ChangeMe#12345';
 
 const ADMINS = {

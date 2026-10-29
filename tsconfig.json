@@ -1,9 +1,13 @@
 {
   "compilerOptions": {
     "target": "ES2021",
-    "lib": ["ES2021", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2021",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
-    "moduleResolution": "bundler",
+    "moduleResolution": "node",
     "jsx": "react-jsx",
     "strict": true,
     "noImplicitOverride": true,
@@ -16,8 +20,14 @@
     "isolatedModules": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "sourceMap": true,
-    "types": ["node", "jest", "@testing-library/jest-dom"]
+    "types": [
+      "node",
+      "jest",
+      "@testing-library/jest-dom"
+    ],
+    "allowJs": false
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts", "tests/**/*.tsx"]
+  "include": [
+    "src"
+  ]
 }

@@ -1,6 +1,6 @@
 import { ERROR_CODES, type ErrorCode, type FieldIssue, type Tokens } from './types';
 
-const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:4100/api/v1';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4100/api/v1';
 
 const ACCESS_TOKEN_KEY = 'sellersdash.admin.accessToken';
 const REFRESH_TOKEN_KEY = 'sellersdash.admin.refreshToken';

@@ -50,7 +50,7 @@ describe('ImageThumb', () => {
     await user.click(screen.getByRole('button', { name: 'View 3 photos of Chai' }));
     const viewer = screen.getByRole('dialog', { name: 'Chai' });
     expect(within(viewer).getByText(/Photo 1 of 3/)).toBeInTheDocument();
-    expect(within(viewer).getByAltText('Chai, photo 1 of 3')).toHaveAttribute('src', THREE[0]!.url);
+    expect(within(viewer).getByAltText('Chai (1 of 3)')).toHaveAttribute('src', THREE[0]!.url);
 
     await user.keyboard('{ArrowRight}');
     expect(within(viewer).getByText(/Photo 2 of 3/)).toBeInTheDocument();
