@@ -5,7 +5,7 @@ import { useFocusTrap } from '../utils/useFocusTrap';
 import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, ExternalLinkIcon, ImageIcon } from './Icon';
 
 /**
- * Photos merchants add to products and raw materials from the app. The admin panel
+ * Photos merchants add to products, services and raw materials from the app. The admin panel
  * only displays them: a thumbnail in lists, a gallery in the edit drawer, and a
  * full-size viewer for both.
  */

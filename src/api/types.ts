@@ -266,6 +266,8 @@ export interface CatalogService {
   categoryName: string | null;
   description: string | null;
   imageUrl: string | null;
+  /** Older API versions omit this; treat a missing list as empty. */
+  images?: CatalogImage[];
   billingUnit: BillingUnit;
   rateMinor: number;
   durationMinutes: number | null;

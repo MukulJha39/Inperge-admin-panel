@@ -334,9 +334,7 @@ export function ServicesPage() {
       header: 'Service',
       grow: true,
       sortable: true,
-      render: (service) => (
-        <span className="text-medium">{service.name}</span>
-      ),
+      render: (service) => <NameWithThumb record={service} name={service.name} />,
     },
     { key: 'category', header: 'Category', render: (service) => service.categoryName ?? '—' },
     {

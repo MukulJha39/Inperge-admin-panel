@@ -412,6 +412,8 @@ export function ServiceEditDrawer({
       onClose={onClose}
       onSubmit={handleSubmit}
     >
+      <ImageGallery record={service} name={service.name} />
+
       <InlineAlert tone="info">
         A service has no stock. Selling one never changes a quantity.
       </InlineAlert>

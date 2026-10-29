@@ -567,7 +567,7 @@ export function MerchantServicesPanel({ merchantId }: { merchantId: string }) {
 
   const columns: Column<CatalogService>[] = [
     { key: 'name', header: 'Service',
-      grow: true, sortable: true, render: (service) => service.name },
+      grow: true, sortable: true, render: (service) => <NameWithThumb record={service} name={service.name} /> },
     {
       key: 'billing',
       header: 'Billing',
