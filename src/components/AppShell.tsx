@@ -8,12 +8,15 @@ import {
   RELATIONSHIP_PERMISSIONS,
 } from '../auth/permissions';
 import { useCatalogMeta } from '../utils/useCatalogMeta';
+import { setAmountsHidden, useAmountsHidden } from '../utils/amountMask';
 import { AccountMenu } from './AccountMenu';
 import { BrandMark } from './BrandMark';
 import { IconButton } from './Button';
 import {
   AccountIcon,
   AlertIcon,
+  EyeIcon,
+  EyeOffIcon,
   AuditIcon,
   CalendarIcon,
   CloseIcon,
@@ -160,6 +163,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { can } = useAuth();
   const location = useLocation();
   const [navOpen, setNavOpen] = useState(false);
+  const hideAmounts = useAmountsHidden();
   // Loaded once at sign-in, so every screen labels quantities with the admin-managed units.
   useCatalogMeta();
 
@@ -223,11 +227,26 @@ export function AppShell({ children }: { children: ReactNode }) {
               <span className="text-sm text-secondary">Internal operational control centre</span>
             </div>
 
-            <AccountMenu />
+            <div className="row gap-2">
+              <button
+                type="button"
+                className={`mask-toggle${hideAmounts ? ' mask-toggle--on' : ''}`}
+                aria-pressed={hideAmounts}
+                title={hideAmounts ? 'Amounts are hidden. Click to show them.' : 'Hide every amount on screen as ₹ XxXx'}
+                onClick={() => setAmountsHidden(!hideAmounts)}
+              >
+                {hideAmounts ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
+                <span className="mask-toggle__label">{hideAmounts ? 'Amounts hidden' : 'Hide amounts'}</span>
+              </button>
+              <AccountMenu />
+            </div>
           </div>
         </header>
 
-        <main className="shell__content">{children}</main>
+        {/* Keyed on the mask, so every figure on the page is redrawn the moment it changes. */}
+        <main key={hideAmounts ? 'amounts-hidden' : 'amounts-shown'} className="shell__content">
+          {children}
+        </main>
       </div>
     </div>
   );

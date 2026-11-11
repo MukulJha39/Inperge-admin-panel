@@ -1,4 +1,5 @@
 import type { Gender } from '../api/types';
+import { amountsHidden, MASKED_AMOUNT } from './amountMask';
 
 const GENDER_LABELS: Record<Gender, string> = {
   male: 'Male',
@@ -90,6 +91,8 @@ export function formatAuditValue(value: unknown): string {
  */
 export function formatMoneyMinor(minor: number | null | undefined, currency = 'INR'): string {
   if (minor === null || minor === undefined) return '—';
+  // "Hide amounts" is on: every displayed figure reads the same, and gives nothing away.
+  if (amountsHidden()) return MASKED_AMOUNT;
 
   try {
     return new Intl.NumberFormat(undefined, {

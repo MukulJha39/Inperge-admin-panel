@@ -31,6 +31,7 @@ import {
 import { useCatalogList } from '../utils/useCatalogList';
 import { PurchaseDetailPanel } from './PurchaseDetail';
 import { CustomerDrawer, SupplierDrawer } from './RelationshipDrawers';
+import { ExportButton } from '../components/ExportButton';
 
 /** Links a row back to the merchant who owns it. */
 function MerchantLink({
@@ -264,6 +265,7 @@ export function CustomersPage() {
         title="Customers"
         description="The people merchants sell to. Archiving one hides them from pickers; it never touches their history."
         badge={list.loading ? null : <Chip tone="brand">{list.meta.total} total</Chip>}
+        actions={<ExportButton report="customers" listPath="/admin/customers" title="Customers" />}
       />
 
       <section className="card">
@@ -465,6 +467,7 @@ export function SuppliersPage() {
         title="Suppliers"
         description="Who merchants buy from, and what is still owed to them."
         badge={list.loading ? null : <Chip tone="brand">{list.meta.total} total</Chip>}
+        actions={<ExportButton report="suppliers" listPath="/admin/suppliers" title="Suppliers" />}
       />
 
       <section className="card">
@@ -665,6 +668,7 @@ export function PurchasesPage() {
         title="Purchases"
         description="What merchants bought, from whom, and whether it has been paid for."
         badge={purchases.loading ? null : <Chip tone="brand">{purchases.meta.total} total</Chip>}
+        actions={<ExportButton report="purchases" listPath="/admin/purchases" title="Purchases" />}
       />
 
       <section className="card">

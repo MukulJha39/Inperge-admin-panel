@@ -106,3 +106,8 @@ export const ORDER_PERMISSIONS = {
   INSTALLMENT_VIEW: 'installment.view',
   INSTALLMENT_MANAGE: 'installment.manage',
 } as const;
+
+/** Taking data out of the panel as a file. Needed on top of the list's own view permission. */
+export const REPORT_PERMISSIONS = {
+  REPORT_EXPORT: 'report.export',
+} as const;

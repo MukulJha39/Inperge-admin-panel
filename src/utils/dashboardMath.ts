@@ -1,3 +1,5 @@
+import { amountsHidden, MASKED_AMOUNT } from './amountMask';
+
 /**
  * The geometry and arithmetic behind the dashboard's charts.
  *
@@ -223,6 +225,7 @@ export function compactNumber(value: number): string {
  */
 export function compactMoneyMinor(minor: number | null | undefined, currency = 'INR'): string {
   if (minor === null || minor === undefined) return '—';
+  if (amountsHidden()) return MASKED_AMOUNT;
 
   try {
     return new Intl.NumberFormat(undefined, {

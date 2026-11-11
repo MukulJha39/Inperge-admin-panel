@@ -44,6 +44,7 @@ import {
 import { useCatalogList } from '../utils/useCatalogList';
 import { OrderDetailPanel } from './OrderDetail';
 import { PaymentActions, PaymentDeleteDialog, PaymentEditDrawer } from './PaymentCorrection';
+import { ExportButton } from '../components/ExportButton';
 
 /** Links a row back to the merchant who owns it. */
 function MerchantLink({
@@ -374,6 +375,7 @@ export function OrdersPage() {
         title="Orders"
         description="What merchants sold, to whom, and whether it has been paid for."
         badge={orders.loading ? null : <Chip tone="brand">{orders.meta.total} total</Chip>}
+        actions={<ExportButton report="orders" listPath="/admin/orders" title="Orders" />}
       />
 
       <section className="card">
@@ -540,6 +542,7 @@ export function ReceivablesPage() {
         title="Receivables"
         description="What is owed to merchants, rolled up per merchant and worst first."
         badge={rows.loading ? null : <Chip tone="brand">{rows.meta.total} merchants</Chip>}
+        actions={<ExportButton report="receivables" listPath="/admin/receivables" title="Receivables" />}
       />
 
       <section className="card">
@@ -666,6 +669,7 @@ export function InstallmentsPage() {
         title="Instalments"
         description="Every instalment still owed across every merchant, soonest first."
         badge={rows.loading ? null : <Chip tone="brand">{rows.meta.total} unpaid</Chip>}
+        actions={<ExportButton report="installments" listPath="/admin/installments" title="Instalments" />}
       />
 
       <section className="card">
@@ -870,6 +874,7 @@ export function PaymentsPage() {
         title="Payments"
         description="Every payment entry across every merchant. A payment entered wrong can be corrected or deleted; the order or purchase is recalculated and the change kept in the audit history."
         badge={payments.loading ? null : <Chip tone="brand">{payments.meta.total} entries</Chip>}
+        actions={<ExportButton report="payments" listPath="/admin/payments" title="Payments" />}
       />
 
       <section className="card">

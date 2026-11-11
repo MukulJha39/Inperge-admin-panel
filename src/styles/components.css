@@ -3101,3 +3101,103 @@ button.thumb:focus-visible {
   background: var(--color-surface);
   list-style: none;
 }
+
+/* "Hide amounts" toggle in the top bar. */
+.mask-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 34px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.mask-toggle:hover {
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+}
+
+.mask-toggle--on {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary-border);
+  color: var(--color-primary);
+  font-weight: var(--weight-medium);
+}
+
+@media (max-width: 640px) {
+  .mask-toggle__label {
+    display: none;
+  }
+}
+
+/* Excel export dialog: column checkboxes and the amounts choice. */
+.export-dialog {
+  width: min(560px, 100%);
+  max-height: calc(100vh - 2 * var(--space-5));
+  display: flex;
+  flex-direction: column;
+}
+
+.export-dialog .dialog__body {
+  overflow-y: auto;
+}
+
+.export-fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+.export-fieldset legend {
+  width: 100%;
+  padding: 0;
+  margin-bottom: var(--space-2);
+}
+
+.export-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-2);
+}
+
+.export-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.export-field:hover {
+  border-color: var(--color-border-strong);
+}
+
+.export-field:has(input:checked) {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary-border);
+}
+
+.export-field input {
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.export-field__tag {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}

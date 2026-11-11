@@ -297,3 +297,19 @@ export const ExternalLinkIcon = ({ size = 16, className }: IconProps) => (
     <path d="M14 11.5v4a1 1 0 0 1-1 1H4.5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h4" />
   </svg>
 );
+
+export const DownloadIcon = ({ size = 16, className }: IconProps) => (
+  <svg {...svgProps(size, className)}>
+    <path d="M10 3v9.5M6 9l4 4 4-4" />
+    <path d="M3.5 14.5v1a1.5 1.5 0 0 0 1.5 1.5h10a1.5 1.5 0 0 0 1.5-1.5v-1" />
+  </svg>
+);
+
+export const ShareIcon = ({ size = 16, className }: IconProps) => (
+  <svg {...svgProps(size, className)}>
+    <circle cx="15" cy="4.5" r="2" />
+    <circle cx="5" cy="10" r="2" />
+    <circle cx="15" cy="15.5" r="2" />
+    <path d="m6.8 9 6.4-3.5M6.8 11l6.4 3.5" />
+  </svg>
+);

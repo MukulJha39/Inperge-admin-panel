@@ -47,6 +47,7 @@ import { useCatalogMeta } from '../utils/useCatalogMeta';
 import { MaterialFormDrawer, ProductFormDrawer, ServiceFormDrawer, type FormTarget } from './CatalogForms';
 import { StockAdjustDrawer, type StockSubject } from './StockAdjustDrawer';
 import { NameWithThumb } from '../components/CatalogImages';
+import { ExportButton } from '../components/ExportButton';
 
 /** Links a catalog row back to the merchant who owns it. */
 function MerchantLink({ merchantId, merchantName }: { merchantId: string; merchantName?: string | null }) {
@@ -89,7 +90,9 @@ function ListHeading({
   loading,
   addLabel,
   onAdd,
+  exportReport,
 }: {
+  exportReport: string;
   scope?: MerchantScope;
   title: string;
   description: string;
@@ -98,11 +101,16 @@ function ListHeading({
   addLabel: string;
   onAdd: (() => void) | null;
 }) {
-  const action = onAdd ? (
-    <Button icon={<PlusIcon />} onClick={onAdd}>
-      {addLabel}
-    </Button>
-  ) : null;
+  const action = (
+    <span className="row gap-2">
+      <ExportButton report={exportReport} listPath={`/admin/${exportReport}`} title={title} />
+      {onAdd ? (
+        <Button icon={<PlusIcon />} onClick={onAdd}>
+          {addLabel}
+        </Button>
+      ) : null}
+    </span>
+  );
 
   if (scope) {
     return (
@@ -121,7 +129,7 @@ function ListHeading({
       title={title}
       description={description}
       badge={loading ? null : <Chip tone="brand">{total} total</Chip>}
-      {...(action ? { actions: action } : {})}
+      actions={action}
     />
   );
 }
@@ -233,6 +241,7 @@ export function ItemsPage({ scope }: { scope?: MerchantScope } = {}) {
     <>
       <ListHeading
         {...(scope ? { scope } : {})}
+        exportReport="items"
         title="Products"
         description="Physical things merchants sell. Stock changes only through an adjustment, never through an edit."
         total={list.meta.total}
@@ -455,6 +464,7 @@ export function ServicesPage({ scope }: { scope?: MerchantScope } = {}) {
     <>
       <ListHeading
         {...(scope ? { scope } : {})}
+        exportReport="services"
         title="Services"
         description="Work merchants sell by time, session, unit or package. A service never carries stock."
         total={list.meta.total}
@@ -683,6 +693,7 @@ export function MaterialsPage({ scope }: { scope?: MerchantScope } = {}) {
     <>
       <ListHeading
         {...(scope ? { scope } : {})}
+        exportReport="materials"
         title="Raw materials"
         description="Inputs merchants buy before making or selling something."
         total={list.meta.total}
@@ -882,6 +893,7 @@ export function LowStockPage() {
         title="Needs attention"
         description="Everything running low or out of stock, across all merchants, worst first."
         badge={list.loading ? null : <Chip tone="warning">{list.meta.total} records</Chip>}
+        actions={<ExportButton report="low-stock" listPath="/admin/low-stock" title="Needs attention" />}
       />
 
       <section className="card">
@@ -1033,6 +1045,7 @@ export function StockActivityPage() {
       <PageHeader
         title="Stock activity"
         description="Every quantity change ever recorded, with its reason and who made it."
+        actions={<ExportButton report="stock-movements" listPath="/admin/stock-movements" title="Stock activity" />}
       />
 
       <section className="card">

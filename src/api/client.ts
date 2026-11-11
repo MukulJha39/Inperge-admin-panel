@@ -158,7 +158,22 @@ async function refreshSession(): Promise<boolean> {
   return refreshInFlight;
 }
 
+/**
+ * The filters each list last asked for, by path. An Excel export reads them so the file
+ * holds exactly the rows on screen; paging is left out because an export takes them all.
+ */
+const lastListQueries = new Map<string, Record<string, QueryValue>>();
+
+export function lastListQuery(path: string): Record<string, QueryValue> {
+  return { ...(lastListQueries.get(path) ?? {}) };
+}
+
 async function send<T>(path: string, options: RequestOptions, isRetry = false): Promise<T> {
+  if ((options.method ?? 'GET') === 'GET' && options.query) {
+    const { page: _page, limit: _limit, ...filters } = options.query;
+    lastListQueries.set(path, filters);
+  }
+
   const headers: Record<string, string> = { Accept: 'application/json' };
   // A file upload goes as multipart; the browser sets that content type with its boundary.
   const isForm = typeof FormData !== 'undefined' && options.body instanceof FormData;
@@ -198,7 +213,43 @@ async function send<T>(path: string, options: RequestOptions, isRetry = false): 
   return parse<T>(response);
 }
 
+function authHeaders(): Record<string, string> {
+  const stored = tokenStore.read();
+  return stored ? { Authorization: `Bearer ${stored.accessToken}` } : {};
+}
+
+export interface DownloadedFile {
+  blob: Blob;
+  fileName: string;
+}
+
+/** Fetches a file (an Excel export), with the same sign-in handling as every other call. */
+async function download(
+  path: string,
+  query: Record<string, QueryValue> = {},
+  isRetry = false,
+): Promise<DownloadedFile> {
+  let response: Response;
+  try {
+    response = await fetch(buildUrl(path, query), { headers: authHeaders() });
+  } catch {
+    throw new ApiError(0, ERROR_CODES.NETWORK_ERROR, 'Cannot reach the server. Check your connection and try again.');
+  }
+
+  if (response.status === 401 && !isRetry) {
+    if (await refreshSession()) return download(path, query, true);
+    announceSessionExpired();
+  }
+  // Errors still come back as the usual JSON envelope.
+  if (!response.ok) return parse<never>(response);
+
+  const disposition = response.headers.get('Content-Disposition') ?? '';
+  const fileName = /filename="?([^";]+)"?/.exec(disposition)?.[1] ?? 'inperge-export.xlsx';
+  return { blob: await response.blob(), fileName };
+}
+
 export const api = {
+  download,
   get: <T>(path: string, options?: Omit<RequestOptions, 'method' | 'body'>) =>
     send<T>(path, { ...options, method: 'GET' }),
   post: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, 'method' | 'body'>) =>

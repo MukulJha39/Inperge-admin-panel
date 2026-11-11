@@ -708,3 +708,19 @@ export function updateUnit(id: string, input: Partial<Omit<MeasurementUnitInput,
 export function deleteUnit(id: string) {
   return api.delete<{ deleted: boolean }>(`/admin/units/${id}`);
 }
+
+/* --------------------------------- exports -------------------------------- */
+
+export interface ExportColumnInfo {
+  key: string;
+  header: string;
+  kind: 'text' | 'money' | 'number' | 'date' | 'datetime' | 'boolean';
+}
+
+/** The columns an Excel report can carry, so the reader can choose which to download. */
+export function fetchExportColumns(report: string, signal?: AbortSignal) {
+  return api.get<{ report: string; title: string; columns: ExportColumnInfo[] }>(
+    `/admin/exports/${report}/columns`,
+    signal ? { signal } : undefined,
+  );
+}
