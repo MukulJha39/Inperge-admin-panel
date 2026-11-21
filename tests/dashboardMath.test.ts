@@ -165,8 +165,9 @@ describe('share', () => {
 });
 
 describe('compactMoneyMinor', () => {
-  it('divides minor units at the moment of display and never before', () => {
-    expect(compactMoneyMinor(450_000)).toContain('4.5');
+  it('never shows an amount in the admin panel', () => {
+    expect(compactMoneyMinor(450_000)).toBe('₹ XxXx');
+    expect(compactMoneyMinor(0)).toBe('₹ XxXx');
   });
 
   it('shows a dash rather than a zero for a missing figure', () => {
@@ -174,8 +175,8 @@ describe('compactMoneyMinor', () => {
     expect(compactMoneyMinor(undefined)).toBe('—');
   });
 
-  it('falls back to a plain amount for an unknown currency code', () => {
-    expect(compactMoneyMinor(123_400, 'NOTACURRENCY')).toBe('NOTACURRENCY 1234');
+  it('masks whatever the currency', () => {
+    expect(compactMoneyMinor(123_400, 'NOTACURRENCY')).toBe('₹ XxXx');
   });
 });
 

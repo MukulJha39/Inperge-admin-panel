@@ -15,11 +15,8 @@ import {
 import { inputToMinor, minorToInput } from '../src/pages/CatalogDrawers';
 
 describe('money display', () => {
-  it('renders whole minor units as a currency amount', () => {
-    // Non-breaking spaces vary by runtime, so the digits are what matter.
-    expect(formatMoneyMinor(4500)).toMatch(/45\.00/);
-    expect(formatMoneyMinor(0)).toMatch(/0\.00/);
-    expect(formatMoneyMinor(4505)).toMatch(/45\.05/);
+  it('never shows an amount in the admin panel', () => {
+    for (const minor of [4500, 0, 4505, 99_999_999]) expect(formatMoneyMinor(minor)).toBe('₹ XxXx');
   });
 
   it('shows a dash rather than a zero for a missing amount', () => {
@@ -27,8 +24,8 @@ describe('money display', () => {
     expect(formatMoneyMinor(undefined)).toBe('—');
   });
 
-  it('still shows the amount for an unfamiliar currency code', () => {
-    expect(formatMoneyMinor(4500, 'ZZZ')).toMatch(/ZZZ\s?45\.00/);
+  it('masks whatever the currency', () => {
+    expect(formatMoneyMinor(4500, 'ZZZ')).toBe('₹ XxXx');
   });
 });
 

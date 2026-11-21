@@ -15,10 +15,10 @@ import { Drawer } from '../components/Drawer';
 import { SelectField, TextField } from '../components/Field';
 import { InlineAlert } from '../components/States';
 import { useToast } from '../components/Toast';
+import { MASKED_AMOUNT } from '../utils/amountMask';
 import { formatDate, formatMoneyMinor } from '../utils/format';
 import { installmentStatusLabel } from '../utils/orderFormat';
 import {
-  minorToAmountInput,
   parseAmountToMinor,
   PAYMENT_METHOD_OPTIONS,
 } from '../utils/paymentFormat';
@@ -62,6 +62,8 @@ export function OrderPaymentDrawer({ order, onClose, onRecorded }: OrderPaymentD
   const [reference, setReference] = useState('');
   const [notes, setNotes] = useState('');
   const [installmentNumber, setInstallmentNumber] = useState('');
+  /** The due instalment's balance, used when the amount is left empty. Never displayed. */
+  const [presetMinor, setPresetMinor] = useState<number | null>(null);
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -83,16 +85,20 @@ export function OrderPaymentDrawer({ order, onClose, onRecorded }: OrderPaymentD
     // Opening on the instalment that is actually due, prefilled with what it owes, is
     // what an administrator taking a payment over the phone needs.
     const next = order.nextDueInstallment;
+    setAmount('');
     if (next) {
       setInstallmentNumber(String(next.number));
-      setAmount(minorToAmountInput(next.outstandingMinor));
+      setPresetMinor(next.outstandingMinor);
     } else {
       setInstallmentNumber('');
-      setAmount('');
+      setPresetMinor(null);
     }
   }, [order]);
 
-  const amountMinor = useMemo(() => parseAmountToMinor(amount), [amount]);
+  const amountMinor = useMemo(
+    () => (amount.trim() ? parseAmountToMinor(amount) : presetMinor),
+    [amount, presetMinor],
+  );
 
   const remaining = useMemo(() => {
     if (!order || amountMinor === null) return null;
@@ -177,6 +183,7 @@ export function OrderPaymentDrawer({ order, onClose, onRecorded }: OrderPaymentD
         <TextField
           label="Amount"
           value={amount}
+          {...(presetMinor !== null ? { placeholder: `${MASKED_AMOUNT} — leave empty for the instalment balance` } : {})}
           onChange={(event) => setAmount(event.target.value)}
           {...(fieldErrors.amountMinor ? { error: fieldErrors.amountMinor } : {})}
           inputMode="decimal"
@@ -252,8 +259,15 @@ export function OrderPaymentDrawer({ order, onClose, onRecorded }: OrderPaymentD
 
 interface PlanRow {
   amount: string;
+  /** An amount kept from the existing plan or from "Split evenly". Never displayed. */
+  presetMinor: number | null;
   dueDate: string;
   notes: string;
+}
+
+/** A row's amount: what was typed, otherwise the kept one. */
+function rowMinor(row: PlanRow): number | null {
+  return row.amount.trim() ? parseAmountToMinor(row.amount) : row.presetMinor;
 }
 
 interface InstallmentPlanDrawerProps {
@@ -263,7 +277,7 @@ interface InstallmentPlanDrawerProps {
 }
 
 function blankRow(offsetDays: number): PlanRow {
-  return { amount: '', dueDate: todayInput(offsetDays), notes: '' };
+  return { amount: '', presetMinor: null, dueDate: todayInput(offsetDays), notes: '' };
 }
 
 /**
@@ -291,7 +305,8 @@ export function InstallmentPlanDrawer({ order, onClose, onSaved }: InstallmentPl
     if (order.installments.length > 0) {
       setRows(
         order.installments.map((entry) => ({
-          amount: minorToAmountInput(entry.amountMinor),
+          amount: '',
+          presetMinor: entry.amountMinor,
           dueDate: entry.dueDate.slice(0, 10),
           notes: entry.notes ?? '',
         })),
@@ -303,7 +318,7 @@ export function InstallmentPlanDrawer({ order, onClose, onSaved }: InstallmentPl
   }, [order]);
 
   const plannedMinor = useMemo(
-    () => rows.reduce((total, row) => total + (parseAmountToMinor(row.amount) ?? 0), 0),
+    () => rows.reduce((total, row) => total + (rowMinor(row) ?? 0), 0),
     [rows],
   );
 
@@ -325,7 +340,8 @@ export function InstallmentPlanDrawer({ order, onClose, onSaved }: InstallmentPl
     setRows((current) =>
       current.map((row, index) => ({
         ...row,
-        amount: minorToAmountInput(index === 0 ? base + remainder : base),
+        amount: '',
+        presetMinor: index === 0 ? base + remainder : base,
       })),
     );
   }
@@ -336,7 +352,7 @@ export function InstallmentPlanDrawer({ order, onClose, onSaved }: InstallmentPl
 
     const installments: InstallmentInput[] = [];
     for (const [index, row] of rows.entries()) {
-      const amountMinor = parseAmountToMinor(row.amount);
+      const amountMinor = rowMinor(row);
       if (amountMinor === null || amountMinor <= 0) {
         setFieldErrors({ [`installments[${index}].amountMinor`]: 'Enter an amount above zero.' });
         return;
@@ -419,7 +435,8 @@ export function InstallmentPlanDrawer({ order, onClose, onSaved }: InstallmentPl
                 <TextField
                   label={`Amount for instalment ${index + 1}`}
                   value={row.amount}
-                  onChange={(event) => updateRow(index, { amount: event.target.value })}
+                  {...(row.presetMinor !== null ? { placeholder: MASKED_AMOUNT } : {})}
+                  onChange={(event) => updateRow(index, { amount: event.target.value, presetMinor: null })}
                   {...(fieldErrors[`installments[${index}].amountMinor`]
                     ? { error: fieldErrors[`installments[${index}].amountMinor`]! }
                     : {})}

@@ -1,49 +1,29 @@
-import { useSyncExternalStore } from 'react';
-
 /**
- * "Hide amounts": masks every money figure in the panel as ₹ XxXx, for when the screen
- * is visible to someone who should not see prices or balances — in a meeting, on a
- * shared screen, or over a shoulder.
+ * Amounts are never shown in the admin panel.
  *
- * Only what is displayed is masked. The figures themselves, the forms that edit them and
- * Excel exports are unchanged. The choice is remembered in this browser.
+ * Every money figure — prices, payments, instalments, balances, dashboard totals — is
+ * displayed as ₹ XxXx, and there is no setting to reveal it. Forms never put a stored
+ * amount into an input either: an amount field starts empty and keeps the current value
+ * unless the administrator types a new one. Excel exports from the panel are masked by
+ * the API in the same way.
  */
 
 export const MASKED_AMOUNT = '₹ XxXx';
-const STORAGE_KEY = 'inperge.admin.hideAmounts';
 
-function readStored(): boolean {
-  try {
-    return localStorage.getItem(STORAGE_KEY) === 'true';
-  } catch {
-    return false;
-  }
+/** Placeholder for an amount input whose stored value is kept but not shown. */
+export const KEEP_AMOUNT_PLACEHOLDER = '₹ XxXx — type a new amount to change it';
+
+/**
+ * Amounts written into server text — "INR 40.00", "₹1,250.00", "Rs. 500" — as they appear
+ * in error messages and audit summaries. Replaced so a sentence never gives a figure away.
+ */
+const AMOUNT_IN_TEXT = /(?:INR|Rs\.?|₹)\s?-?\d[\d,]*(?:\.\d+)?/gi;
+
+export function maskAmountsInText(text: string): string {
+  return text.replace(AMOUNT_IN_TEXT, MASKED_AMOUNT);
 }
 
-let hidden = readStored();
-const listeners = new Set<() => void>();
-
-/** Read by the money formatters on every call, so a toggle reaches every figure. */
-export function amountsHidden(): boolean {
-  return hidden;
-}
-
-export function setAmountsHidden(next: boolean): void {
-  hidden = next;
-  try {
-    localStorage.setItem(STORAGE_KEY, String(next));
-  } catch {
-    // Private mode: the choice simply lasts for this visit.
-  }
-  listeners.forEach((listener) => listener());
-}
-
-function subscribe(listener: () => void): () => void {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-}
-
-/** Whether amounts are hidden, re-rendering the caller when it changes. */
-export function useAmountsHidden(): boolean {
-  return useSyncExternalStore(subscribe, amountsHidden, amountsHidden);
+/** Whether an audit change records money, judged by its field name (paidMinor, sellingPriceMinor, …). */
+export function isMoneyField(field: string): boolean {
+  return /Minor$/.test(field);
 }

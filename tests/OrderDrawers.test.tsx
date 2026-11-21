@@ -109,8 +109,9 @@ describe('OrderPaymentDrawer', () => {
 
   it('states what is paid and what is left before anything is typed', () => {
     renderDrawer();
-    expect(screen.getByText(/₹100.00 of ₹300.00 paid/)).toBeInTheDocument();
-    expect(screen.getByText(/₹200.00 outstanding/)).toBeInTheDocument();
+    expect(screen.getByText(/₹ XxXx of ₹ XxXx paid/)).toBeInTheDocument();
+    expect(screen.getByText(/₹ XxXx outstanding/)).toBeInTheDocument();
+    expect(screen.queryByText(/100\.00|200\.00|300\.00/)).not.toBeInTheDocument();
   });
 
   it('previews what will remain as the amount is typed', async () => {
@@ -118,7 +119,7 @@ describe('OrderPaymentDrawer', () => {
     renderDrawer();
 
     await user.type(screen.getByLabelText('Amount'), '50');
-    expect(await screen.findByText('₹150.00 will remain outstanding.')).toBeInTheDocument();
+    expect(await screen.findByText('₹ XxXx will remain outstanding.')).toBeInTheDocument();
   });
 
   it('says plainly when an amount settles the order in full', async () => {
@@ -136,7 +137,7 @@ describe('OrderPaymentDrawer', () => {
     await user.type(screen.getByLabelText('Amount'), '500');
     await user.click(screen.getByRole('button', { name: 'Record payment' }));
 
-    expect(await screen.findByText(/That is more than the ₹200.00 outstanding./)).toBeInTheDocument();
+    expect(await screen.findByText(/That is more than the ₹ XxXx outstanding./)).toBeInTheDocument();
     expect(mocked.recordAdminOrderPayment).not.toHaveBeenCalled();
   });
 
@@ -178,7 +179,7 @@ describe('OrderPaymentDrawer', () => {
     expect(screen.queryByLabelText('Towards which instalment?')).not.toBeInTheDocument();
   });
 
-  it('opens on the instalment that is due, prefilled with what it owes', async () => {
+  it('opens on the instalment that is due, keeping what it owes without showing it', async () => {
     const next = installment({ number: 2, amountMinor: 10_000, outstandingMinor: 10_000, isNextDue: true });
     renderDrawer({
       ...ORDER,
@@ -190,7 +191,9 @@ describe('OrderPaymentDrawer', () => {
       nextDueInstallment: next,
     });
 
-    expect(await screen.findByDisplayValue('100.00')).toBeInTheDocument();
+    const amount = screen.getByLabelText('Amount');
+    expect(amount).toHaveValue('');
+    expect(amount).toHaveAttribute('placeholder', expect.stringContaining('instalment balance'));
     const picker = screen.getByLabelText('Towards which instalment?') as HTMLSelectElement;
     expect(picker.value).toBe('2');
     // A paid instalment is not offered: there is nothing left to pay against it.
@@ -225,7 +228,7 @@ describe('OrderPaymentDrawer', () => {
     await user.type(screen.getByLabelText('Amount'), '150');
 
     expect(
-      await screen.findByText(/only owes ₹100.00. The rest still counts towards the order/),
+      await screen.findByText(/only owes ₹ XxXx. The rest still counts towards the order/),
     ).toBeInTheDocument();
   });
 
@@ -241,7 +244,7 @@ describe('OrderPaymentDrawer', () => {
     await user.click(screen.getByRole('button', { name: 'Record payment' }));
 
     expect(
-      await screen.findByText('That is more than the outstanding amount of INR 200.00.'),
+      await screen.findByText('That is more than the outstanding amount of ₹ XxXx.'),
     ).toBeInTheDocument();
   });
 });
@@ -272,21 +275,29 @@ describe('InstallmentPlanDrawer', () => {
 
     expect(screen.getByLabelText('Amount for instalment 1')).toBeInTheDocument();
     expect(screen.getByLabelText('Amount for instalment 2')).toBeInTheDocument();
-    expect(screen.getByText('₹300.00 short')).toBeInTheDocument();
+    expect(screen.getByText('₹ XxXx short')).toBeInTheDocument();
   });
 
-  it('splits the total the way the server would, remainder on the first', async () => {
+  it('splits the total the way the server would, remainder on the first, without showing it', async () => {
     const user = userEvent.setup();
     // ₹100.00 over three does not divide evenly.
     renderDrawer({ ...ORDER, totalMinor: 10_000, paidMinor: 0, outstandingMinor: 10_000 });
+    mocked.setAdminInstallmentPlan.mockResolvedValue({ order: ORDER });
 
     await user.click(screen.getByRole('button', { name: 'Add an instalment' }));
     await user.click(screen.getByRole('button', { name: 'Split evenly' }));
 
-    expect((screen.getByLabelText('Amount for instalment 1') as HTMLInputElement).value).toBe('33.34');
-    expect((screen.getByLabelText('Amount for instalment 2') as HTMLInputElement).value).toBe('33.33');
-    expect((screen.getByLabelText('Amount for instalment 3') as HTMLInputElement).value).toBe('33.33');
+    for (const index of [1, 2, 3]) {
+      const input = screen.getByLabelText(`Amount for instalment ${index}`) as HTMLInputElement;
+      expect(input.value).toBe('');
+      expect(input.placeholder).toBe('₹ XxXx');
+    }
     expect(screen.getByText('Adds up')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Save plan' }));
+    await waitFor(() => expect(mocked.setAdminInstallmentPlan).toHaveBeenCalled());
+    const [, installments] = mocked.setAdminInstallmentPlan.mock.calls[0]!;
+    expect(installments.map((entry) => entry.amountMinor)).toEqual([3_334, 3_333, 3_333]);
   });
 
   it('refuses to send a plan that does not add up, and says by how much', async () => {
@@ -298,7 +309,7 @@ describe('InstallmentPlanDrawer', () => {
     await user.click(screen.getByRole('button', { name: 'Save plan' }));
 
     expect(
-      await screen.findByText('The instalments are ₹100.00 short of the order total.'),
+      await screen.findByText('The instalments are ₹ XxXx short of the order total.'),
     ).toBeInTheDocument();
     expect(mocked.setAdminInstallmentPlan).not.toHaveBeenCalled();
   });
@@ -312,7 +323,7 @@ describe('InstallmentPlanDrawer', () => {
     await user.click(screen.getByRole('button', { name: 'Save plan' }));
 
     expect(
-      await screen.findByText('The instalments are ₹100.00 more than the order total.'),
+      await screen.findByText('The instalments are ₹ XxXx more than the order total.'),
     ).toBeInTheDocument();
   });
 
@@ -335,7 +346,7 @@ describe('InstallmentPlanDrawer', () => {
   it('warns that a deposit already taken will be spread across the plan', () => {
     renderDrawer();
     expect(
-      screen.getByText(/₹100.00 has already been paid. It will be spread across the plan/),
+      screen.getByText(/₹ XxXx has already been paid. It will be spread across the plan/),
     ).toBeInTheDocument();
   });
 
@@ -350,7 +361,10 @@ describe('InstallmentPlanDrawer', () => {
       ],
     });
 
-    expect((screen.getByLabelText('Amount for instalment 1') as HTMLInputElement).value).toBe('200.00');
+    // The plan's amounts are kept but never shown.
+    const first = screen.getByLabelText('Amount for instalment 1') as HTMLInputElement;
+    expect(first.value).toBe('');
+    expect(first.placeholder).toBe('₹ XxXx');
     // An optional field's label carries the word "Optional" alongside it.
     expect((screen.getByLabelText(/Note for instalment 1/) as HTMLInputElement).value).toBe('Deposit');
     expect(screen.getByText('Adds up')).toBeInTheDocument();
@@ -365,7 +379,7 @@ describe('InstallmentPlanDrawer', () => {
     expect(screen.getByText('Adds up')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Remove instalment 2' }));
-    expect(await screen.findByText('₹150.00 short')).toBeInTheDocument();
+    expect(await screen.findByText('₹ XxXx short')).toBeInTheDocument();
   });
 
   it('surfaces the server refusal when a plan cannot be replaced', async () => {

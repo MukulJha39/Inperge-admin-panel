@@ -8,7 +8,7 @@ import { DataTable, type Column } from '../components/DataTable';
 import { SearchInput } from '../components/Field';
 import { PageHeader } from '../components/PageHeader';
 import { Pagination } from '../components/Pagination';
-import { formatAuditAction, formatAuditValue, formatDateTime } from '../utils/format';
+import { formatAuditAction, formatAuditSummary, formatAuditValue, formatDateTime } from '../utils/format';
 import { useDebounce } from '../utils/useDebounce';
 
 const ACTOR_OPTIONS = [
@@ -110,7 +110,7 @@ export function AuditPage() {
       key: 'summary',
       header: 'What happened',
       grow: true,
-      render: (entry) => <span>{entry.summary}</span>,
+      render: (entry) => <span>{formatAuditSummary(entry.summary)}</span>,
     },
     {
       key: 'changes',
@@ -118,7 +118,7 @@ export function AuditPage() {
       render: (entry) => entry.changes.length > 0 ? (
         <span className="text-xs text-muted text-mono">
           {entry.changes
-            .map((change) => `${change.field}: ${formatAuditValue(change.from)} → ${formatAuditValue(change.to)}`)
+            .map((change) => `${change.field}: ${formatAuditValue(change.from, change.field)} → ${formatAuditValue(change.to, change.field)}`)
             .join(' · ')}
         </span>
       ) : '—',

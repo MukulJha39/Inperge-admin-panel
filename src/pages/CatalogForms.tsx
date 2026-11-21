@@ -38,7 +38,8 @@ import { InlineAlert } from '../components/States';
 import { useToast } from '../components/Toast';
 import { billingUnitLabel, formatQuantity, unitLabel, unitOptions } from '../utils/format';
 import { useCatalogMeta } from '../utils/useCatalogMeta';
-import { inputToMinor, minorToInput, moneyError, nameError, quantityError } from './CatalogDrawers';
+import { KEEP_AMOUNT_PLACEHOLDER } from '../utils/amountMask';
+import { inputToMinor, moneyError, nameError, quantityError } from './CatalogDrawers';
 
 /**
  * Creating and editing products, services and raw materials on a merchant's behalf.
@@ -452,8 +453,9 @@ export function ProductFormDrawer({
     setUnit(item?.unit ?? '');
     setTrackStock(item?.trackStock ?? true);
     setOpening('');
-    setSellingPrice(item ? minorToInput(item.sellingPriceMinor) : '');
-    setCostPrice(minorToInput(item?.costPriceMinor));
+    // Stored prices are never put into the form; an empty field keeps them.
+    setSellingPrice('');
+    setCostPrice('');
     setTaxRate(item?.taxRatePercent === null || item?.taxRatePercent === undefined ? '' : String(item.taxRatePercent));
     setThreshold(item ? String(item.lowStockThreshold) : '');
     setDescription(item?.description ?? '');
@@ -475,7 +477,7 @@ export function ProductFormDrawer({
     const errors: Record<string, string> = {};
     const checks: Array<[string, string | undefined]> = [
       ['name', nameError(name)],
-      ['sellingPriceMinor', moneyError(sellingPrice, { required: true })],
+      ['sellingPriceMinor', moneyError(sellingPrice, { required: !editing })],
       ['costPriceMinor', moneyError(costPrice)],
       ['taxRatePercent', percentError(taxRate)],
       ['lowStockThreshold', quantityError(threshold)],
@@ -494,8 +496,8 @@ export function ProductFormDrawer({
       barcode: barcode.trim() || null,
       unit,
       trackStock,
-      sellingPriceMinor: inputToMinor(sellingPrice) ?? 0,
-      costPriceMinor: inputToMinor(costPrice),
+      ...(sellingPrice.trim() ? { sellingPriceMinor: inputToMinor(sellingPrice) ?? 0 } : {}),
+      ...(costPrice.trim() ? { costPriceMinor: inputToMinor(costPrice) } : {}),
       taxRatePercent: optionalNumber(taxRate),
       lowStockThreshold: threshold.trim() === '' ? 0 : Number(threshold),
       description: description.trim() || null,
@@ -584,8 +586,8 @@ export function ProductFormDrawer({
       </div>
 
       <div className="field-grid">
-        <TextField label="Selling price (₹)" type="number" step="0.01" min="0" inputMode="decimal" value={sellingPrice} onChange={(event) => setSellingPrice(event.target.value)} {...errorProps(form.fieldErrors, 'sellingPriceMinor')} />
-        <TextField label="Cost price (₹)" optional type="number" step="0.01" min="0" inputMode="decimal" value={costPrice} onChange={(event) => setCostPrice(event.target.value)} {...errorProps(form.fieldErrors, 'costPriceMinor')} />
+        <TextField label="Selling price (₹)" optional={Boolean(editing)} type="number" step="0.01" min="0" inputMode="decimal" {...(editing ? { placeholder: KEEP_AMOUNT_PLACEHOLDER } : {})} value={sellingPrice} onChange={(event) => setSellingPrice(event.target.value)} {...errorProps(form.fieldErrors, 'sellingPriceMinor')} />
+        <TextField label="Cost price (₹)" optional type="number" step="0.01" min="0" inputMode="decimal" {...(editing ? { placeholder: KEEP_AMOUNT_PLACEHOLDER } : {})} value={costPrice} onChange={(event) => setCostPrice(event.target.value)} {...errorProps(form.fieldErrors, 'costPriceMinor')} />
         <TextField label="Tax rate (%)" optional type="number" step="0.01" min="0" max="100" inputMode="decimal" value={taxRate} onChange={(event) => setTaxRate(event.target.value)} {...errorProps(form.fieldErrors, 'taxRatePercent')} />
       </div>
 
@@ -642,7 +644,7 @@ export function ServiceFormDrawer({
     setName(service?.name ?? '');
     setCategoryId(service?.categoryId ?? '');
     setBillingUnit(service?.billingUnit ?? 'one_time');
-    setRate(service ? minorToInput(service.rateMinor) : '');
+    setRate('');
     setDuration(service?.durationMinutes ? String(service.durationMinutes) : '');
     setTaxRate(service?.taxRatePercent === null || service?.taxRatePercent === undefined ? '' : String(service.taxRatePercent));
     setIsActive(service?.isActive ?? true);
@@ -660,7 +662,7 @@ export function ServiceFormDrawer({
 
     const errors: Record<string, string> = {};
     const nameIssue = nameError(name);
-    const rateIssue = moneyError(rate, { required: true });
+    const rateIssue = moneyError(rate, { required: !editing });
     const taxIssue = percentError(taxRate);
     if (nameIssue) errors.name = nameIssue;
     if (rateIssue) errors.rateMinor = rateIssue;
@@ -677,7 +679,7 @@ export function ServiceFormDrawer({
       name: name.trim(),
       categoryId: categoryId || null,
       billingUnit,
-      rateMinor: inputToMinor(rate) ?? 0,
+      ...(rate.trim() ? { rateMinor: inputToMinor(rate) ?? 0 } : {}),
       durationMinutes: supportsDuration && duration.trim() !== '' ? Number(duration) : null,
       taxRatePercent: optionalNumber(taxRate),
       isActive,
@@ -750,7 +752,7 @@ export function ServiceFormDrawer({
       />
 
       <div className="field-grid">
-        <TextField label="Rate (₹)" type="number" step="0.01" min="0" inputMode="decimal" value={rate} onChange={(event) => setRate(event.target.value)} {...errorProps(form.fieldErrors, 'rateMinor')} />
+        <TextField label="Rate (₹)" optional={Boolean(editing)} type="number" step="0.01" min="0" inputMode="decimal" {...(editing ? { placeholder: KEEP_AMOUNT_PLACEHOLDER } : {})} value={rate} onChange={(event) => setRate(event.target.value)} {...errorProps(form.fieldErrors, 'rateMinor')} />
         {supportsDuration ? (
           <TextField label="Duration (minutes)" optional type="number" step="1" min="1" inputMode="numeric" value={duration} onChange={(event) => setDuration(event.target.value)} {...errorProps(form.fieldErrors, 'durationMinutes')} />
         ) : null}
@@ -801,7 +803,7 @@ export function MaterialFormDrawer({
     setUnit(material?.unit ?? '');
     setTrackStock(material?.trackStock ?? true);
     setOpening('');
-    setPurchaseCost(minorToInput(material?.purchaseCostMinor));
+    setPurchaseCost('');
     setThreshold(material ? String(material.lowStockThreshold) : '');
     setBatchReference(material?.batchReference ?? '');
     setExpiryDate(material?.expiryDate ? material.expiryDate.slice(0, 10) : '');
@@ -839,7 +841,7 @@ export function MaterialFormDrawer({
       categoryId: categoryId || null,
       unit,
       trackStock,
-      purchaseCostMinor: inputToMinor(purchaseCost),
+      ...(purchaseCost.trim() ? { purchaseCostMinor: inputToMinor(purchaseCost) } : {}),
       lowStockThreshold: threshold.trim() === '' ? 0 : Number(threshold),
       batchReference: batchReference.trim() || null,
       expiryDate: expiryDate || null,
@@ -916,7 +918,7 @@ export function MaterialFormDrawer({
 
       <div className="field-grid">
         <SelectField label="Unit" options={units} value={unit} onChange={(event) => setUnit(event.target.value)} {...errorProps(form.fieldErrors, 'unit')} />
-        <TextField label="Purchase cost (₹)" optional type="number" step="0.01" min="0" inputMode="decimal" value={purchaseCost} hint="What one unit costs to buy." onChange={(event) => setPurchaseCost(event.target.value)} {...errorProps(form.fieldErrors, 'purchaseCostMinor')} />
+        <TextField label="Purchase cost (₹)" optional type="number" step="0.01" min="0" inputMode="decimal" {...(editing ? { placeholder: KEEP_AMOUNT_PLACEHOLDER } : {})} value={purchaseCost} hint={editing ? 'Leave empty to keep the current cost.' : 'What one unit costs to buy.'} onChange={(event) => setPurchaseCost(event.target.value)} {...errorProps(form.fieldErrors, 'purchaseCostMinor')} />
       </div>
 
       <CheckboxField label="Track stock for this material" checked={trackStock} onChange={setTrackStock} />

@@ -1,43 +1,53 @@
-import { act, render, renderHook, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import * as client from '../src/api/client';
 import * as endpoints from '../src/api/endpoints';
 import * as auth from '../src/auth/AuthContext';
 import { ExportButton } from '../src/components/ExportButton';
 import { ToastProvider } from '../src/components/Toast';
-import { MASKED_AMOUNT, amountsHidden, setAmountsHidden, useAmountsHidden } from '../src/utils/amountMask';
+import { MASKED_AMOUNT, maskAmountsInText } from '../src/utils/amountMask';
 import { compactMoneyMinor } from '../src/utils/dashboardMath';
-import { formatMoneyMinor } from '../src/utils/format';
+import { formatAuditSummary, formatAuditValue, formatMoneyMinor } from '../src/utils/format';
 
 afterEach(() => {
-  setAmountsHidden(false);
   jest.restoreAllMocks();
 });
 
-describe('hide amounts', () => {
-  it('masks every money figure while on, and only money', () => {
-    expect(formatMoneyMinor(4_500)).toMatch(/45\.00/);
-
-    setAmountsHidden(true);
+describe('amounts are never shown', () => {
+  it('masks every money figure, with no setting to reveal it', () => {
     expect(formatMoneyMinor(4_500)).toBe(MASKED_AMOUNT);
     expect(formatMoneyMinor(0)).toBe(MASKED_AMOUNT);
     expect(compactMoneyMinor(12_500_000)).toBe(MASKED_AMOUNT);
     // "Not set" stays distinguishable from an amount.
     expect(formatMoneyMinor(null)).toBe('—');
-
-    setAmountsHidden(false);
-    expect(formatMoneyMinor(4_500)).toMatch(/45\.00/);
+    expect(localStorage.getItem('inperge.admin.hideAmounts')).toBeNull();
   });
 
-  it('remembers the choice in this browser and tells subscribers', () => {
-    const { result } = renderHook(() => useAmountsHidden());
-    expect(result.current).toBe(false);
+  it('masks amounts quoted inside server text', () => {
+    expect(maskAmountsInText('That is more than the outstanding amount of INR 200.00.')).toBe(
+      'That is more than the outstanding amount of ₹ XxXx.',
+    );
+    expect(maskAmountsInText('Paid ₹1,250.50 and Rs. 300 by UPI')).toBe('Paid ₹ XxXx and ₹ XxXx by UPI');
+    // Numbers that are not money are left alone.
+    expect(maskAmountsInText('Order ORD-0042 has 3 lines')).toBe('Order ORD-0042 has 3 lines');
+  });
 
-    act(() => setAmountsHidden(true));
+  it('masks amounts in audit summaries and money changes, and nothing else', () => {
+    expect(formatAuditSummary('Recorded INR 40.00 against order ORD-0001 by upi; INR 60.00 outstanding.')).toBe(
+      'Recorded ₹ XxXx against order ORD-0001 by upi; ₹ XxXx outstanding.',
+    );
+    expect(formatAuditValue(4_000, 'paidMinor')).toBe(MASKED_AMOUNT);
+    expect(formatAuditValue(4_000, 'sellingPriceMinor')).toBe(MASKED_AMOUNT);
+    expect(formatAuditValue(12, 'lowStockThreshold')).toBe('12');
+    expect(formatAuditValue(null, 'paidMinor')).toBe('empty');
+  });
 
-    expect(result.current).toBe(true);
-    expect(amountsHidden()).toBe(true);
-    expect(localStorage.getItem('inperge.admin.hideAmounts')).toBe('true');
+  it('masks amounts in error messages from the server', () => {
+    const error = new client.ApiError(409, 'CONFLICT', 'This payment can be at most INR 90.00.', {
+      details: [{ field: 'amountMinor', message: 'At most INR 90.00.' }],
+    });
+    expect(error.message).toBe('This payment can be at most ₹ XxXx.');
+    expect(error.fieldErrors().amountMinor).toBe('At most ₹ XxXx.');
   });
 });
 
@@ -88,7 +98,7 @@ describe('ExportButton', () => {
     jest.spyOn(endpoints, 'fetchExportColumns').mockResolvedValue({ report: 'orders', title: 'Orders', columns: COLUMNS });
   });
 
-  it('asks before downloading, with every column ticked and amounts shown', async () => {
+  it('asks before downloading, with every column ticked', async () => {
     const user = userEvent.setup();
     const download = mockDownload();
     jest.spyOn(client, 'lastListQuery').mockReturnValue({ merchantId: 'm-1', status: 'completed' });
@@ -96,7 +106,9 @@ describe('ExportButton', () => {
     const dialog = await openDialog(user);
     expect(download).not.toHaveBeenCalled();
     for (const column of COLUMNS) expect(within(dialog).getByLabelText(new RegExp(`^${column.header}`))).toBeChecked();
-    expect(within(dialog).getByLabelText('Show amounts')).toBeChecked();
+    // Amounts in an admin export are always masked; there is no choice to make.
+    expect(within(dialog).queryByLabelText('Show amounts')).not.toBeInTheDocument();
+    expect(within(dialog).getByText('Amounts are always written as ₹ XxXx in the file.')).toBeInTheDocument();
 
     await user.click(within(dialog).getByRole('button', { name: 'Download Excel' }));
 
@@ -111,7 +123,7 @@ describe('ExportButton', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('sends only the chosen columns, and masks amounts when asked', async () => {
+  it('sends only the chosen columns, and never asks the API to show amounts', async () => {
     const user = userEvent.setup();
     const download = mockDownload();
     jest.spyOn(client, 'lastListQuery').mockReturnValue({});
@@ -119,27 +131,23 @@ describe('ExportButton', () => {
     const dialog = await openDialog(user);
     await user.click(within(dialog).getByLabelText('Customer'));
     await user.click(within(dialog).getByLabelText(/^Paid/));
-    await user.click(within(dialog).getByLabelText('Mask as ₹ XxXx'));
     await user.click(within(dialog).getByRole('button', { name: 'Download Excel' }));
 
     await waitFor(() =>
-      expect(download).toHaveBeenCalledWith(
-        '/admin/exports/orders',
-        expect.objectContaining({ columns: 'order,total', maskAmounts: 'true' }),
-      ),
+      expect(download).toHaveBeenCalledWith('/admin/exports/orders', expect.objectContaining({ columns: 'order,total' })),
     );
+    expect(download.mock.calls[0]![1]).not.toHaveProperty('maskAmounts');
   });
 
-  it('offers the amounts choice only when a chosen column has amounts', async () => {
+  it('notes the masking only when a chosen column has amounts', async () => {
     const user = userEvent.setup();
     const dialog = await openDialog(user);
 
     await user.click(within(dialog).getByLabelText(/^Total/));
-    expect(within(dialog).getByLabelText('Mask as ₹ XxXx')).toBeInTheDocument();
+    expect(within(dialog).getByText(/always written as ₹ XxXx/)).toBeInTheDocument();
     await user.click(within(dialog).getByLabelText(/^Paid/));
-    expect(within(dialog).queryByLabelText('Mask as ₹ XxXx')).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/always written as ₹ XxXx/)).not.toBeInTheDocument();
   });
-
   it('needs at least one column', async () => {
     const user = userEvent.setup();
     const download = mockDownload();
@@ -160,7 +168,6 @@ describe('ExportButton', () => {
 
     const first = await openDialog(user);
     await user.click(within(first).getByLabelText('Customer'));
-    await user.click(within(first).getByLabelText('Mask as ₹ XxXx'));
     await user.click(within(first).getByRole('button', { name: 'Download Excel' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
@@ -169,16 +176,6 @@ describe('ExportButton', () => {
     await within(second).findByLabelText('Order');
     expect(within(second).getByLabelText('Customer')).not.toBeChecked();
     expect(within(second).getByLabelText('Order')).toBeChecked();
-    expect(within(second).getByLabelText('Mask as ₹ XxXx')).toBeChecked();
-  });
-
-  it('starts masked while amounts are hidden on screen', async () => {
-    const user = userEvent.setup();
-    setAmountsHidden(true);
-
-    const dialog = await openDialog(user);
-
-    expect(within(dialog).getByLabelText('Mask as ₹ XxXx')).toBeChecked();
   });
 
   it('explains a refused export and keeps the dialog open', async () => {

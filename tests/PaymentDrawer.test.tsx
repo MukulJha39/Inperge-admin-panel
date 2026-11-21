@@ -186,7 +186,7 @@ describe('PaymentDrawer', () => {
     await user.click(screen.getByRole('button', { name: 'Record payment' }));
 
     expect(
-      await screen.findByText('That is more than the outstanding amount of INR 60.00.'),
+      await screen.findByText('That is more than the outstanding amount of ₹ XxXx.'),
     ).toBeInTheDocument();
     // The drawer stays open with the values intact.
     expect(onClose).not.toHaveBeenCalled();

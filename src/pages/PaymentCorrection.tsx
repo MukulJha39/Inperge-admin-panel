@@ -11,7 +11,8 @@ import { EditIcon, TrashIcon } from '../components/Icon';
 import { InlineAlert } from '../components/States';
 import { useToast } from '../components/Toast';
 import { formatDateTime, formatMoneyMinor } from '../utils/format';
-import { minorToAmountInput, parseAmountToMinor, paymentMethodLabel } from '../utils/paymentFormat';
+import { KEEP_AMOUNT_PLACEHOLDER } from '../utils/amountMask';
+import { parseAmountToMinor, paymentMethodLabel } from '../utils/paymentFormat';
 
 /**
  * Fixing a payment that was entered wrong: changing its amount, or deleting it.
@@ -49,7 +50,8 @@ export function PaymentEditDrawer({ payment, outstandingMinor, onClose, onSaved 
 
   useEffect(() => {
     if (!payment) return;
-    setAmount(minorToAmountInput(payment.amountMinor));
+    // The recorded amount is never shown; an empty field leaves it as it is.
+    setAmount('');
     setReference(payment.reference ?? '');
     setNotes(payment.notes ?? '');
     setReason('');
@@ -61,24 +63,25 @@ export function PaymentEditDrawer({ payment, outstandingMinor, onClose, onSaved 
     payment && outstandingMinor !== null && outstandingMinor !== undefined
       ? payment.amountMinor + outstandingMinor
       : null;
-  const amountMinor = parseAmountToMinor(amount);
+  const typed = amount.trim() !== '';
+  const amountMinor = typed ? parseAmountToMinor(amount) : null;
   const amountChanged = Boolean(payment && amountMinor !== null && amountMinor !== payment.amountMinor);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!payment || saving) return;
 
-    if (amountMinor === null || amountMinor <= 0) {
+    if (typed && (amountMinor === null || amountMinor <= 0)) {
       setFieldErrors({ amountMinor: 'Enter an amount greater than zero.' });
       return;
     }
-    if (maxMinor !== null && amountMinor > maxMinor) {
+    if (amountMinor !== null && maxMinor !== null && amountMinor > maxMinor) {
       setFieldErrors({ amountMinor: `This payment can be at most ${formatMoneyMinor(maxMinor)}.` });
       return;
     }
 
     const input: PaymentCorrectionInput = {};
-    if (amountChanged) input.amountMinor = amountMinor;
+    if (amountChanged && amountMinor !== null) input.amountMinor = amountMinor;
     if (reference.trim() !== (payment.reference ?? '')) input.reference = reference.trim() || null;
     if (notes.trim() !== (payment.notes ?? '')) input.notes = notes.trim() || null;
     if (Object.keys(input).length === 0) {
@@ -94,7 +97,7 @@ export function PaymentEditDrawer({ payment, outstandingMinor, onClose, onSaved 
       const result = await correctAdminPayment(payment.id, input);
       toast.success(
         amountChanged
-          ? `Payment changed from ${formatMoneyMinor(payment.amountMinor)} to ${formatMoneyMinor(amountMinor)}`
+          ? 'Payment amount corrected'
           : 'Payment details updated',
         `${result.payable.reference}: ${formatMoneyMinor(result.payable.outstandingMinor)} outstanding.`,
       );
@@ -144,6 +147,7 @@ export function PaymentEditDrawer({ payment, outstandingMinor, onClose, onSaved 
         <TextField
           label="Correct amount"
           value={amount}
+          placeholder={KEEP_AMOUNT_PLACEHOLDER}
           inputMode="decimal"
           onChange={(event) => setAmount(event.target.value)}
           {...(maxMinor !== null ? { hint: `At most ${formatMoneyMinor(maxMinor)}, the most this order or purchase still allows.` } : {})}
@@ -268,11 +272,12 @@ export function PaymentActions({
   onEdit: (payment: PaymentEntry) => void;
   onDelete: (payment: PaymentEntry) => void;
 }) {
-  const amount = formatMoneyMinor(payment.amountMinor);
+  // Named by when and how it was paid: amounts are never shown, so they cannot tell rows apart.
+  const which = `${paymentMethodLabel(payment.method)} payment of ${formatDateTime(payment.paidAt)}`;
   return (
     <span className="row gap-1">
-      <IconButton label={`Correct the ${amount} payment`} icon={<EditIcon />} onClick={() => onEdit(payment)} />
-      <IconButton label={`Delete the ${amount} payment`} icon={<TrashIcon />} onClick={() => onDelete(payment)} />
+      <IconButton label={`Correct the ${which}`} icon={<EditIcon />} onClick={() => onEdit(payment)} />
+      <IconButton label={`Delete the ${which}`} icon={<TrashIcon />} onClick={() => onDelete(payment)} />
     </span>
   );
 }

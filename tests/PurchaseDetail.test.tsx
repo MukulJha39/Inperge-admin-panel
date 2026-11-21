@@ -143,9 +143,9 @@ describe('PurchaseDetailPanel', () => {
 
     const table = screen.getByRole('table');
     expect(within(table).getByText('Other costs')).toBeInTheDocument();
-    // Subtotal, other costs and total are all stated rather than left to be added up.
-    expect(within(table).getAllByText('₹2,586.00').length).toBeGreaterThan(0);
-    expect(within(table).getAllByText('₹2,736.00').length).toBeGreaterThan(0);
+    // Subtotal, other costs and total each have a row, but amounts are never shown.
+    expect(within(table).getAllByText('₹ XxXx').length).toBeGreaterThan(2);
+    expect(within(table).queryByText(/2,586|2,736/)).not.toBeInTheDocument();
   });
 
   it('labels an overdue purchase as overdue, not merely part paid', async () => {

@@ -1,3 +1,4 @@
+import { maskAmountsInText } from '../utils/amountMask';
 import { ERROR_CODES, type ErrorCode, type FieldIssue, type Tokens } from './types';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4100/api/v1';
@@ -18,11 +19,12 @@ export class ApiError extends Error {
     message: string,
     options?: { details?: FieldIssue[]; requestId?: string },
   ) {
-    super(message);
+    // Server messages can quote amounts ("more than INR 200.00"); the panel never shows them.
+    super(maskAmountsInText(message));
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
-    this.details = options?.details ?? [];
+    this.details = (options?.details ?? []).map((issue) => ({ ...issue, message: maskAmountsInText(issue.message) }));
     if (options?.requestId) this.requestId = options.requestId;
   }
 

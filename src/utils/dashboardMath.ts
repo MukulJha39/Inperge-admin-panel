@@ -1,4 +1,4 @@
-import { amountsHidden, MASKED_AMOUNT } from './amountMask';
+import { MASKED_AMOUNT } from './amountMask';
 
 /**
  * The geometry and arithmetic behind the dashboard's charts.
@@ -223,21 +223,10 @@ export function compactNumber(value: number): string {
  * Money shortened for a headline figure. The exact amount is always kept beside it in a
  * tooltip, so nothing is lost by rounding here.
  */
-export function compactMoneyMinor(minor: number | null | undefined, currency = 'INR'): string {
+export function compactMoneyMinor(minor: number | null | undefined, _currency = 'INR'): string {
+  // Amounts are never shown in the admin panel; "not set" still reads as a dash.
   if (minor === null || minor === undefined) return '—';
-  if (amountsHidden()) return MASKED_AMOUNT;
-
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: 'currency',
-      currency,
-      notation: 'compact',
-      maximumFractionDigits: 1,
-    }).format(minor / 100);
-  } catch {
-    // An unknown currency code should not break a card.
-    return `${currency} ${Math.round(minor / 100)}`;
-  }
+  return MASKED_AMOUNT;
 }
 
 /** "Good morning" / "Good afternoon" / "Good evening", by the reader's own clock. */

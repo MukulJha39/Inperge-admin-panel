@@ -51,8 +51,9 @@ describe('PaymentEditDrawer', () => {
     withToasts(<PaymentEditDrawer payment={PAYMENT} outstandingMinor={100_000} onClose={jest.fn()} onSaved={onSaved} />);
 
     const amount = screen.getByLabelText('Correct amount');
-    expect(amount).toHaveValue('4000.00');
-    await user.clear(amount);
+    // The recorded amount is never put into the form.
+    expect(amount).toHaveValue('');
+    expect(amount).toHaveAttribute('placeholder', expect.stringContaining('₹ XxXx'));
     await user.type(amount, '400');
     await user.type(screen.getByLabelText(/Reason for the change/), 'Typed an extra zero');
     await user.click(screen.getByRole('button', { name: 'Save correction' }));
@@ -75,7 +76,7 @@ describe('PaymentEditDrawer', () => {
     await user.type(amount, '6000');
     await user.click(screen.getByRole('button', { name: 'Save correction' }));
 
-    expect(await screen.findByText(/can be at most ₹5,000.00/)).toBeInTheDocument();
+    expect(await screen.findByText('This payment can be at most ₹ XxXx.')).toBeInTheDocument();
     expect(mocked.correctAdminPayment).not.toHaveBeenCalled();
   });
 
@@ -123,8 +124,8 @@ describe('PaymentTimeline', () => {
         <PaymentTimeline payments={[PAYMENT]} emptyText="None" canManage outstandingMinor={0} onChanged={jest.fn()} />
       </ToastProvider>,
     );
-    expect(screen.getByRole('button', { name: 'Correct the ₹4,000.00 payment' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Delete the ₹4,000.00 payment' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Correct the UPI payment of/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Delete the UPI payment of/ })).toBeInTheDocument();
   });
 
   it('opens the correction drawer from a row and refreshes after saving', async () => {
@@ -136,7 +137,7 @@ describe('PaymentTimeline', () => {
       <PaymentTimeline payments={[PAYMENT]} emptyText="None" canManage outstandingMinor={100_000} onChanged={onChanged} />,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Correct the ₹4,000.00 payment' }));
+    await user.click(screen.getByRole('button', { name: /^Correct the UPI payment of/ }));
     const amount = await screen.findByLabelText('Correct amount');
     await user.clear(amount);
     await user.type(amount, '3000');

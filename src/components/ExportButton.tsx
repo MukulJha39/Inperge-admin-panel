@@ -4,7 +4,7 @@ import { ApiError, api, lastListQuery, type DownloadedFile } from '../api/client
 import { fetchExportColumns, type ExportColumnInfo } from '../api/endpoints';
 import { useAuth } from '../auth/AuthContext';
 import { REPORT_PERMISSIONS } from '../auth/permissions';
-import { amountsHidden } from '../utils/amountMask';
+import { MASKED_AMOUNT } from '../utils/amountMask';
 import { useFocusTrap } from '../utils/useFocusTrap';
 import { Button } from './Button';
 import { DownloadIcon, ShareIcon } from './Icon';
@@ -41,7 +41,6 @@ function saveFile({ blob, fileName }: DownloadedFile): void {
 
 interface ExportChoice {
   columns: string[];
-  maskAmounts: boolean;
 }
 
 const choiceKey = (report: string) => `inperge.admin.export.${report}`;
@@ -73,9 +72,9 @@ interface ExportDialogProps {
 }
 
 /**
- * Chooses what goes into the file before it is made: which columns, and whether any
- * amounts are written out or masked as ₹ XxXx. The last choice for each report is
- * remembered, so a regular export is two clicks.
+ * Chooses which columns go into the file before it is made. The last choice for each
+ * report is remembered, so a regular export is two clicks. Amounts in an admin export
+ * are always masked as ₹ XxXx by the API; there is no option to include them.
  */
 function ExportDialog({ report, listPath, title, onClose }: ExportDialogProps) {
   const toast = useToast();
@@ -84,7 +83,6 @@ function ExportDialog({ report, listPath, title, onClose }: ExportDialogProps) {
   const [columns, setColumns] = useState<ExportColumnInfo[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [maskAmounts, setMaskAmounts] = useState(false);
   const [busy, setBusy] = useState<'download' | 'share' | null>(null);
   const [shareable] = useState(canShareFiles);
 
@@ -104,8 +102,6 @@ function ExportDialog({ report, listPath, title, onClose }: ExportDialogProps) {
         const kept = (remembered?.columns ?? []).filter((key) => keys.includes(key));
         setColumns(result.columns);
         setSelected(new Set(kept.length > 0 ? kept : keys));
-        // Hidden amounts on screen start the file hidden too; otherwise the last choice.
-        setMaskAmounts(amountsHidden() || Boolean(remembered?.maskAmounts));
       })
       .catch((error) => {
         if (error instanceof DOMException && error.name === 'AbortError') return;
@@ -132,7 +128,7 @@ function ExportDialog({ report, listPath, title, onClose }: ExportDialogProps) {
     if (!columns || busy || selected.size === 0) return;
     // In the report's own order, whatever order they were ticked in.
     const chosen = columns.filter((column) => selected.has(column.key)).map((column) => column.key);
-    saveChoice(report, { columns: chosen, maskAmounts });
+    saveChoice(report, { columns: chosen });
 
     setBusy(mode);
     try {
@@ -141,7 +137,6 @@ function ExportDialog({ report, listPath, title, onClose }: ExportDialogProps) {
         // So times in the file read as the reader's own clock.
         utcOffsetMinutes: -new Date().getTimezoneOffset(),
         ...(chosen.length < columns.length ? { columns: chosen.join(',') } : {}),
-        ...(hasAmounts && maskAmounts ? { maskAmounts: 'true' } : {}),
       });
 
       if (mode === 'share') {
@@ -222,24 +217,7 @@ function ExportDialog({ report, listPath, title, onClose }: ExportDialogProps) {
               </fieldset>
 
               {hasAmounts ? (
-                <fieldset className="export-fieldset">
-                  <legend className="field__label">Amounts</legend>
-                  <div className="row gap-2 wrap">
-                    <label className="checkbox">
-                      <input type="radio" name={`${titleId}-amounts`} checked={!maskAmounts} onChange={() => setMaskAmounts(false)} />
-                      Show amounts
-                    </label>
-                    <label className="checkbox">
-                      <input type="radio" name={`${titleId}-amounts`} checked={maskAmounts} onChange={() => setMaskAmounts(true)} />
-                      Mask as ₹ XxXx
-                    </label>
-                  </div>
-                  <span className="field__hint">
-                    {maskAmounts
-                      ? 'Every amount in the file is written as ₹ XxXx — for sharing without prices.'
-                      : 'Amounts are written as numbers in rupees, so they add up in Excel.'}
-                  </span>
-                </fieldset>
+                <p className="field__hint">Amounts are always written as {MASKED_AMOUNT} in the file.</p>
               ) : null}
             </>
           ) : null}

@@ -11,7 +11,11 @@ import { AccountIcon, CalendarIcon, ClockIcon, LockIcon, RolesIcon } from '../co
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState, ErrorState, InlineAlert, Skeleton } from '../components/States';
 import { useToast } from '../components/Toast';
-import { formatAuditAction, formatDateTime } from '../utils/format';
+import {
+  formatAuditAction,
+  formatAuditSummary,
+  formatDateTime,
+} from '../utils/format';
 import { ChangePasswordForm } from './ChangePasswordPage';
 
 /**
@@ -271,7 +275,7 @@ function ActivitySection() {
                 <span className="feed__dot" />
               </span>
               <div className="grow">
-                <div className="feed__summary">{entry.summary}</div>
+                <div className="feed__summary">{formatAuditSummary(entry.summary)}</div>
                 <div className="feed__meta row gap-2 wrap">
                   <Chip mono>{formatAuditAction(entry.action)}</Chip>
                   <time dateTime={entry.createdAt} title={formatDateTime(entry.createdAt)}>

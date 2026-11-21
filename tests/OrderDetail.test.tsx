@@ -186,8 +186,9 @@ describe('OrderDetailPanel', () => {
     const [lineTable] = screen.getAllByRole('table');
     expect(within(lineTable!).getByText('Discount (10%)')).toBeInTheDocument();
     expect(within(lineTable!).getByText('Tax (18%)')).toBeInTheDocument();
-    expect(within(lineTable!).getByText('−₹23.00')).toBeInTheDocument();
-    expect(within(lineTable!).getByText('₹37.26')).toBeInTheDocument();
+    // The rows are there; the amounts in them are never shown.
+    expect(within(lineTable!).queryByText(/23\.00|37\.26/)).not.toBeInTheDocument();
+    expect(within(lineTable!).getAllByText(/₹ XxXx/).length).toBeGreaterThan(2);
   });
 
   it('labels an overdue order as overdue, not merely part paid', async () => {

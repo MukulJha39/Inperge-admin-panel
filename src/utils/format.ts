@@ -1,5 +1,5 @@
 import type { Gender } from '../api/types';
-import { amountsHidden, MASKED_AMOUNT } from './amountMask';
+import { isMoneyField, maskAmountsInText, MASKED_AMOUNT } from './amountMask';
 
 const GENDER_LABELS: Record<Gender, string> = {
   male: 'Male',
@@ -77,10 +77,17 @@ export function formatAuditAction(action: string): string {
   return readable.charAt(0).toUpperCase() + readable.slice(1);
 }
 
-export function formatAuditValue(value: unknown): string {
+export function formatAuditValue(value: unknown, field?: string): string {
   if (value === null || value === undefined || value === '') return 'empty';
   if (typeof value === 'boolean') return value ? 'yes' : 'no';
-  return String(value);
+  // A recorded change to money is shown as a change, never as the figures.
+  if (field && isMoneyField(field)) return MASKED_AMOUNT;
+  return maskAmountsInText(String(value));
+}
+
+/** An audit or activity summary as written by the server, with any amounts masked. */
+export function formatAuditSummary(summary: string): string {
+  return maskAmountsInText(summary);
 }
 
 /* ------------------------------ Phase 2: catalog ----------------------------- */
@@ -89,21 +96,10 @@ export function formatAuditValue(value: unknown): string {
  * Money arrives as whole minor units, so it is divided only at the moment of display.
  * Nothing in the panel does arithmetic on a major-unit float.
  */
-export function formatMoneyMinor(minor: number | null | undefined, currency = 'INR'): string {
+export function formatMoneyMinor(minor: number | null | undefined, _currency = 'INR'): string {
+  // Amounts are never shown in the admin panel; "not set" still reads as a dash.
   if (minor === null || minor === undefined) return '—';
-  // "Hide amounts" is on: every displayed figure reads the same, and gives nothing away.
-  if (amountsHidden()) return MASKED_AMOUNT;
-
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: 'currency',
-      currency,
-      minimumFractionDigits: 2,
-    }).format(minor / 100);
-  } catch {
-    // An unknown currency code should not break a table.
-    return `${currency} ${(minor / 100).toFixed(2)}`;
-  }
+  return MASKED_AMOUNT;
 }
 
 /**

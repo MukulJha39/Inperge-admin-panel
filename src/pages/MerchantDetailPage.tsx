@@ -19,6 +19,7 @@ import { EmptyState, ErrorState, InlineAlert, Skeleton } from '../components/Sta
 import { TabPanel, Tabs } from '../components/Tabs';
 import {
   formatAuditAction,
+  formatAuditSummary,
   formatAuditValue,
   formatDateTime,
   formatPhone,
@@ -406,7 +407,7 @@ export function MerchantDetailPage() {
                   <div key={entry.id} className="timeline__item">
                     <span className="timeline__dot" aria-hidden="true" />
                     <div>
-                      <div className="timeline__summary">{entry.summary}</div>
+                      <div className="timeline__summary">{formatAuditSummary(entry.summary)}</div>
                       <div className="timeline__meta">
                         {formatAuditAction(entry.action)} · {entry.actorLabel} ({entry.actorType}) ·{' '}
                         {formatDateTime(entry.createdAt)}
@@ -415,7 +416,7 @@ export function MerchantDetailPage() {
                         <div className="timeline__changes">
                           {entry.changes.map((change) => (
                             <span key={change.field} className="timeline__change">
-                              {change.field}: {formatAuditValue(change.from)} → {formatAuditValue(change.to)}
+                              {change.field}: {formatAuditValue(change.from, change.field)} → {formatAuditValue(change.to, change.field)}
                             </span>
                           ))}
                         </div>

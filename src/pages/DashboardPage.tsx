@@ -34,7 +34,11 @@ import {
   greeting,
   type DonutInput,
 } from '../utils/dashboardMath';
-import { formatDateTime, formatMoneyMinor } from '../utils/format';
+import {
+  formatAuditSummary,
+  formatDateTime,
+  formatMoneyMinor,
+} from '../utils/format';
 import { customerLabel, orderStatusLabel, orderStatusTone } from '../utils/orderFormat';
 import { COLLECTION_WINDOW_DAYS, useDashboard } from '../utils/useDashboard';
 import { useNow } from '../utils/useMotion';
@@ -554,7 +558,7 @@ export function DashboardPage() {
                         <span className="feed__dot" />
                       </span>
                       <div className="grow">
-                        <div className="feed__summary">{entry.summary}</div>
+                        <div className="feed__summary">{formatAuditSummary(entry.summary)}</div>
                         <div className="feed__meta">
                           {entry.actorLabel} · <time dateTime={entry.createdAt} title={formatDateTime(entry.createdAt)}>
                             {formatDateTime(entry.createdAt)}
